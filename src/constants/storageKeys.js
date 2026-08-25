@@ -1,0 +1,5 @@
+export const STORAGE_KEYS = {
+  TOKEN: 'TOKEN',
+  USER_DATA: 'USER_DATA',
+  HAS_ONBOARDED: 'HAS_ONBOARDED',
+};

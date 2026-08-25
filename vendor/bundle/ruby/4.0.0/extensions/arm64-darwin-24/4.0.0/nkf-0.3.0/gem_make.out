@@ -1,0 +1,19 @@
+current directory: /Users/prerna/Projects/UGolf/vendor/bundle/ruby/4.0.0/gems/nkf-0.3.0/ext/nkf
+/opt/homebrew/opt/ruby/bin/ruby extconf.rb
+creating Makefile
+
+current directory: /Users/prerna/Projects/UGolf/vendor/bundle/ruby/4.0.0/gems/nkf-0.3.0/ext/nkf
+make -j11 DESTDIR\= sitearchdir\=./.gem.20260703-53993-v7k0mb sitelibdir\=./.gem.20260703-53993-v7k0mb clean
+
+current directory: /Users/prerna/Projects/UGolf/vendor/bundle/ruby/4.0.0/gems/nkf-0.3.0/ext/nkf
+make -j11 DESTDIR\= sitearchdir\=./.gem.20260703-53993-v7k0mb sitelibdir\=./.gem.20260703-53993-v7k0mb
+compiling nkf.c
+linking shared-object nkf.bundle
+ld: warning: search path '/opt/homebrew/Cellar/openssl@3/3.6.2/lib' not found
+
+current directory: /Users/prerna/Projects/UGolf/vendor/bundle/ruby/4.0.0/gems/nkf-0.3.0/ext/nkf
+make -j11 DESTDIR\= sitearchdir\=./.gem.20260703-53993-v7k0mb sitelibdir\=./.gem.20260703-53993-v7k0mb install
+/usr/bin/install -c -m 0755 nkf.bundle ./.gem.20260703-53993-v7k0mb
+
+current directory: /Users/prerna/Projects/UGolf/vendor/bundle/ruby/4.0.0/gems/nkf-0.3.0/ext/nkf
+make DESTDIR\= sitearchdir\=./.gem.20260703-53993-v7k0mb sitelibdir\=./.gem.20260703-53993-v7k0mb clean
