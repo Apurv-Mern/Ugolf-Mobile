@@ -25,6 +25,12 @@ import {
   getStartGameReadinessApi,
   getGameSessionApi,
 } from '../../services/playService';
+import {
+  classifyTournamentPlay,
+  inProgressActivityMs,
+  unwrapReadiness,
+} from '../../utils/playProgress';
+import { getPlayerGameHistoryApi } from '../../services/playerService';
 
 const trophyImg = require('../../assets/Images/ trophy.png');
 const homescreenBg = require('../../assets/Images/homescreen_bg.jpg');
@@ -44,9 +50,11 @@ const InProgressGamesScreen = ({ navigation }) => {
       if (isRef) setRefreshing(true);
       else setLoading(true);
 
-      const [mineRes, invitedRes] = await Promise.all([
+      const [mineRes, invitedRes, playedRes, historyRes] = await Promise.all([
         getTournamentsApi({ scope: 'mine', limit: 20 }).catch(() => null),
         getTournamentsApi({ scope: 'invited', limit: 20 }).catch(() => null),
+        getTournamentsApi({ scope: 'played', limit: 20 }).catch(() => null),
+        getPlayerGameHistoryApi().catch(() => null),
       ]);
 
       const extractList = (res) => {
@@ -77,6 +85,17 @@ const InProgressGamesScreen = ({ navigation }) => {
         const id = String(t.id || t._id || `invited-${idx}`);
         if (!byId.has(id)) byId.set(id, { ...t, id, source: 'invited' });
       });
+      extractList(playedRes).forEach((t, idx) => {
+        const id = String(t.id || t._id || `played-${idx}`);
+        if (!byId.has(id)) byId.set(id, { ...t, id, source: 'played' });
+      });
+
+      const historyList =
+        historyRes?.history ||
+        historyRes?.data?.history ||
+        historyRes?.data ||
+        (Array.isArray(historyRes) ? historyRes : []);
+      const history = Array.isArray(historyList) ? historyList : [];
 
       const candidates = Array.from(byId.values());
 
@@ -88,7 +107,7 @@ const InProgressGamesScreen = ({ navigation }) => {
       const readinessResults = await Promise.all(
         candidates.map((t) =>
           getStartGameReadinessApi(t.id)
-            .then((res) => res?.data || res)
+            .then((res) => unwrapReadiness(res))
             .catch(() => null),
         ),
       );
@@ -98,9 +117,18 @@ const InProgressGamesScreen = ({ navigation }) => {
       for (let i = 0; i < candidates.length; i++) {
         const t = candidates[i];
         const readiness = readinessResults[i];
+        const play = classifyTournamentPlay(t, readiness);
+        if (!play.isInProgress) continue;
 
-        if (readiness?.activeSession?.id) {
-          const session = readiness.activeSession;
+        const rawMode = String(t.playMode || t.mode || '').toUpperCase();
+        const playMode = rawMode.includes('CHALLENGE') ? 'challenge' : 'practice';
+        const activityMs = inProgressActivityMs(
+          { id: t.id, tournament: t, hasActiveSession: play.hasActiveSession, activeSession: play.activeSession },
+          history,
+        );
+
+        if (play.hasActiveSession && play.activeSession?.id) {
+          const session = play.activeSession;
           const sessionRes = await getGameSessionApi(t.id, session.id)
             .then((res) => res?.play || res?.data?.play || res?.data || res)
             .catch(() => null);
@@ -116,32 +144,54 @@ const InProgressGamesScreen = ({ navigation }) => {
           const nineLabel =
             totalHoles === 9 ? (holeStart <= 9 ? 'Front 9' : 'Back 9') : `${totalHoles} holes`;
 
-          const rawMode = String(t.playMode || t.mode || '').toUpperCase();
-          const playMode = rawMode.includes('CHALLENGE') ? 'challenge' : 'practice';
-
           activeGamesList.push({
             id: `${t.id}-${session.id}`,
             tournament: t,
             tournamentName: t.name || t.title || 'Tournament',
             courseTitle: courseName ? `${courseName} — ${nineLabel}` : nineLabel,
             sessionId: session.id,
-            gameNumber: Number(session.gameNumber) || 1,
+            gameNumber: Number(session.gameNumber) || play.nextGameNumber || 1,
+            nextGameNumber: play.nextGameNumber,
             playMode,
+            hasActiveSession: true,
+            holeLabel: `Hole ${holeIndex} / ${totalHoles}`,
             holeIndex,
             totalHoles,
             progress: holeIndex / totalHoles,
+            badge: 'LIVE ROUND',
+            actionLabel: `CONTINUE GAME ${Number(session.gameNumber) || play.nextGameNumber || 1}`,
             date: t.startDate ? formatDisplayDate(t.startDate) : '',
-            updatedAt: t.updatedAt || t.updated_at || t.createdAt || t.created_at || t.startDate,
+            activityMs,
           });
+          continue;
         }
+
+        activeGamesList.push({
+          id: `${t.id}-next-${play.nextGameNumber || play.completedCount}`,
+          tournament: t,
+          tournamentName: t.name || t.title || 'Tournament',
+          courseTitle:
+            play.nextGameNumber != null
+              ? `Start Game ${play.nextGameNumber} of ${play.numberOfGames}`
+              : t.clubName || t.location || t.city || '',
+          sessionId: null,
+          gameNumber: play.nextGameNumber || 1,
+          nextGameNumber: play.nextGameNumber,
+          playMode,
+          hasActiveSession: false,
+          holeLabel: `Game ${play.completedCount} / ${play.numberOfGames} done`,
+          holeIndex: play.completedCount,
+          totalHoles: play.numberOfGames,
+          progress: play.numberOfGames > 0 ? play.completedCount / play.numberOfGames : 0,
+          badge: 'IN PROGRESS',
+          actionLabel:
+            play.nextGameNumber != null ? `START GAME ${play.nextGameNumber}` : 'CONTINUE',
+          date: t.startDate ? formatDisplayDate(t.startDate) : '',
+          activityMs,
+        });
       }
 
-      // Sort games by latest timestamp
-      activeGamesList.sort((a, b) => {
-        const timeA = a.updatedAt ? new Date(a.updatedAt).getTime() : 0;
-        const timeB = b.updatedAt ? new Date(b.updatedAt).getTime() : 0;
-        return timeB - timeA;
-      });
+      activeGamesList.sort((a, b) => (b.activityMs || 0) - (a.activityMs || 0));
 
       setGames(activeGamesList);
     } catch (err) {
@@ -162,11 +212,20 @@ const InProgressGamesScreen = ({ navigation }) => {
   );
 
   const handleContinueGame = (game) => {
-    navigation.navigate('ActiveGame', {
+    if (game.sessionId) {
+      navigation.navigate('ActiveGame', {
+        tournament: game.tournament,
+        sessionId: game.sessionId,
+        gameNumber: game.gameNumber,
+        playMode: game.playMode,
+      });
+      return;
+    }
+    navigation.navigate('SelectGame', {
       tournament: game.tournament,
-      sessionId: game.sessionId,
-      gameNumber: game.gameNumber,
       playMode: game.playMode,
+      gameNumber: game.nextGameNumber || game.gameNumber || 1,
+      selectedGameIndex: Math.max(0, (game.nextGameNumber || game.gameNumber || 1) - 1),
     });
   };
 
@@ -229,7 +288,7 @@ const InProgressGamesScreen = ({ navigation }) => {
               <View style={styles.liveTopRow}>
                 <View style={styles.liveBadge}>
                   <View style={styles.liveDot} />
-                  <Text style={styles.liveText}>LIVE ROUND</Text>
+                  <Text style={styles.liveText}>{game.badge || 'LIVE ROUND'}</Text>
                 </View>
                 <View style={styles.rightHeaderBlock}>
                   <View
@@ -252,7 +311,7 @@ const InProgressGamesScreen = ({ navigation }) => {
                     </Text>
                   </View>
                   <Text style={styles.holeText}>
-                    Hole {game.holeIndex} / {game.totalHoles}
+                    {game.holeLabel || `Hole ${game.holeIndex} / ${game.totalHoles}`}
                   </Text>
                 </View>
               </View>
@@ -279,7 +338,9 @@ const InProgressGamesScreen = ({ navigation }) => {
                 activeOpacity={0.85}
               >
                 <Text style={styles.continueRoundIcon}>▶</Text>
-                <Text style={styles.continueRoundText}>CONTINUE ROUND</Text>
+                <Text style={styles.continueRoundText}>
+                  {game.actionLabel || `CONTINUE GAME ${game.gameNumber || 1}`}
+                </Text>
               </TouchableOpacity>
             </View>
           ))

@@ -75,7 +75,8 @@ goto fail
 :execute
 @rem Setup the command line
 
-
+@rem Limit Ninja/CMake clang++ jobs. New Architecture C++ compile OOMs on Windows otherwise.
+if not defined CMAKE_BUILD_PARALLEL_LEVEL set CMAKE_BUILD_PARALLEL_LEVEL=1
 
 @rem Execute Gradle
 "%JAVA_EXE%" %DEFAULT_JVM_OPTS% %JAVA_OPTS% %GRADLE_OPTS% "-Dorg.gradle.appname=%APP_BASE_NAME%" -jar "%APP_HOME%\gradle\wrapper\gradle-wrapper.jar" %*

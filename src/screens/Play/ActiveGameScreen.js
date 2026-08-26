@@ -1556,6 +1556,7 @@ import { wp, hp, fontSize, moderateScale } from '../../utils/responsive';
 
 import {
   getGameSessionApi,
+  getStartGameReadinessApi,
   answerYesSessionApi,
   answerNoSessionApi,
   confirmInstructionSessionApi,
@@ -1600,11 +1601,10 @@ const ActiveGameScreen = ({ navigation, route }) => {
   const [promptText, setPromptText] = useState('After playing your shot…');
   const [questionText, setQuestionText] = useState('');
   const [activeQuestionId, setActiveQuestionId] = useState('');
-  const [hasQuestion, setHasQuestion] = useState(false);
-  const [activeQuestion, setActiveQuestion] = useState(null);
   const [questionList, setQuestionList] = useState([]);
-  const [answerMode, setAnswerMode] = useState('');
-  const [selectedOptionIds, setSelectedOptionIds] = useState([]);
+  const [answerMode, setAnswerMode] = useState('YES_NO');
+  const [hiddenQuestionCount, setHiddenQuestionCount] = useState(0);
+  const [allowNo, setAllowNo] = useState(true);
   const [instructionText, setInstructionText] = useState('');
   const [mapData, setMapData] = useState(emptyMap);
   const [playMeta, setPlayMeta] = useState({
@@ -1617,6 +1617,7 @@ const ActiveGameScreen = ({ navigation, route }) => {
   });
 
   const [showGameEndModal, setShowGameEndModal] = useState(false);
+  const [nextGameNumber, setNextGameNumber] = useState(null);
   const [actionLoading, setActionLoading] = useState(false);
 
   const canCallSessionApi =
@@ -1704,87 +1705,26 @@ const ActiveGameScreen = ({ navigation, route }) => {
         });
       }
 
-      const qList = playData.questions || [];
-      const modeVal = String(playData.answerMode || playData.mode || '').toUpperCase();
-      setAnswerMode(modeVal);
-      setQuestionList(Array.isArray(qList) ? qList : []);
+      const qList = Array.isArray(playData.questions) ? playData.questions : [];
+      const modeVal = String(playData.answerMode || '').toUpperCase();
+      const resolvedMode =
+        modeVal === 'YES_ONLY' || modeVal === 'YES_NO'
+          ? modeVal
+          : qList.length > 1
+            ? 'YES_ONLY'
+            : 'YES_NO';
+      setAnswerMode(resolvedMode);
+      setQuestionList(qList);
+      setHiddenQuestionCount(Number(playData.hiddenQuestionCount) || 0);
+      setAllowNo(playData.allowNo !== false && screen === 'QUESTIONS');
 
-      let activeQ = null;
-
-      if (Array.isArray(qList) && qList.length > 0) {
-        activeQ = qList[0];
-      } else if (playData.currentQuestion) {
-        activeQ = playData.currentQuestion;
-      } else if (playData.questionText || playData.question) {
-        activeQ = {
-          id: playData.questionId || playData.id || '',
-          text: playData.questionText || playData.question,
-          type: playData.questionType || playData.type || 'SINGLE',
-          allowMultiple: playData.allowMultiple || playData.isMultiple || false,
-          required: playData.required ?? playData.isRequired ?? true,
-          options: playData.options || playData.answers || playData.choices || [],
-        };
-      }
-
-      if (activeQ) {
-        const qId = String(activeQ.id || activeQ._id || activeQ.questionId || '');
-        const qText = activeQ.text || activeQ.question || '';
-        const rawOpts = Array.isArray(activeQ.options) && activeQ.options.length > 0
-          ? activeQ.options
-          : (Array.isArray(activeQ.answers) && activeQ.answers.length > 0
-              ? activeQ.answers
-              : (Array.isArray(activeQ.choices) && activeQ.choices.length > 0
-                  ? activeQ.choices
-                  : [
-                      { id: 'YES', text: 'YES', label: 'YES' },
-                      { id: 'NO', text: 'NO', label: 'NO' },
-                    ]));
-
-        const isMulti =
-          activeQ.allowMultiple === true ||
-          activeQ.isMultiple === true ||
-          activeQ.multiselect === true ||
-          String(activeQ.type || activeQ.questionType || activeQ.selectionType || '').toUpperCase().includes('MULTI') ||
-          String(activeQ.type || activeQ.questionType || '').toUpperCase().includes('CHECKBOX');
-
-        const isReq = activeQ.required !== false && activeQ.isRequired !== false;
-
-        const formattedQ = {
-          id: qId,
-          text: qText,
-          isMultiSelect: isMulti,
-          isRequired: isReq,
-          options: rawOpts.map((opt, idx) => {
-            if (typeof opt === 'string') {
-              return { id: opt, text: opt, label: opt };
-            }
-            return {
-              id: String(opt.id || opt._id || opt.value || opt.key || `opt-${idx}`),
-              text: opt.text || opt.label || opt.title || opt.name || opt.value || `Option ${idx + 1}`,
-              value: opt.value || opt.id || opt.text,
-            };
-          }),
-        };
-
-        setHasQuestion(true);
-        setQuestionText(qText);
-        setActiveQuestionId(qId);
-        setActiveQuestion(formattedQ);
-
-        const existingAnswers = activeQ.selectedAnswers || activeQ.userAnswer || activeQ.selectedOptionIds || [];
-        if (Array.isArray(existingAnswers) && existingAnswers.length > 0) {
-          setSelectedOptionIds(existingAnswers.map(String));
-        } else if (typeof existingAnswers === 'string' && existingAnswers) {
-          setSelectedOptionIds([existingAnswers]);
-        } else {
-          setSelectedOptionIds([]);
-        }
+      if (qList.length > 0) {
+        const first = qList[0];
+        setQuestionText(first.text || first.question || '');
+        setActiveQuestionId(String(first.id || first._id || first.questionId || ''));
       } else {
-        setHasQuestion(false);
         setQuestionText('');
         setActiveQuestionId('');
-        setActiveQuestion(null);
-        setSelectedOptionIds([]);
       }
 
       if (screen === 'FINISHED' || playData.finished || playData.isFinished || playData.status === 'FINISHED') {
@@ -1838,83 +1778,47 @@ const ActiveGameScreen = ({ navigation, route }) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tournamentId, activeSessionId]);
 
-  const handleToggleOption = (optionId) => {
-    if (!activeQuestion) return;
+  useEffect(() => {
+    if (playScreen !== 'FINISHED' && !showGameEndModal) return;
 
-    const optIdStr = String(optionId);
-    if (activeQuestion.isMultiSelect) {
-      // Multi-select: toggle selection / deselection
-      if (selectedOptionIds.includes(optIdStr)) {
-        setSelectedOptionIds(selectedOptionIds.filter((id) => id !== optIdStr));
-      } else {
-        setSelectedOptionIds([...selectedOptionIds, optIdStr]);
-      }
-    } else {
-      // Single-select: toggle or select 1 answer
-      if (selectedOptionIds.includes(optIdStr)) {
-        setSelectedOptionIds([]);
-      } else {
-        setSelectedOptionIds([optIdStr]);
-      }
-    }
-  };
+    const currentGame = Number(playMeta.gameNumber) || 1;
+    const totalGames = Number(tournament?.numberOfGames) || 0;
+    setNextGameNumber(totalGames > currentGame ? currentGame + 1 : null);
 
-  const handleSubmitAnswer = (overrideOptionId = null) => {
-    if (!activeQuestionId) {
+    if (!tournamentId || !isUuid(String(tournamentId))) return undefined;
+
+    let cancelled = false;
+    getStartGameReadinessApi(tournamentId)
+      .then((res) => {
+        if (cancelled) return;
+        const data = res?.data || res;
+        const next = data?.nextGameNumber != null ? Number(data.nextGameNumber) : null;
+        setNextGameNumber(Number.isFinite(next) ? next : null);
+      })
+      .catch(() => {});
+
+    return () => {
+      cancelled = true;
+    };
+  }, [playScreen, showGameEndModal, playMeta.gameNumber, tournamentId, tournament?.numberOfGames]);
+
+  const handleAnswerYes = (questionId) => {
+    const id = String(questionId || '');
+    if (!id) {
       Toast.show({
         type: 'error',
         text1: 'No question',
-        text2: 'There is no active question to answer.',
+        text2: 'There is no active question to answer Yes.',
       });
       return;
     }
-
-    let finalSelection = [...selectedOptionIds];
-    if (overrideOptionId) {
-      const optStr = String(overrideOptionId);
-      if (activeQuestion?.isMultiSelect) {
-        if (!finalSelection.includes(optStr)) {
-          finalSelection.push(optStr);
-        }
-      } else {
-        finalSelection = [optStr];
-      }
-    }
-
-    // Required check validation:
-    if (activeQuestion?.isRequired && finalSelection.length === 0) {
-      Toast.show({
-        type: 'error',
-        text1: 'Answer Required',
-        text2: 'Please select an answer to continue.',
-      });
-      return;
-    }
-
-    const payload = {
-      questionId: activeQuestionId,
-      selectedOptionIds: finalSelection,
-      selectedOptions: finalSelection,
-      answers: finalSelection,
-      answer: finalSelection.join(','),
-    };
-
-    const firstOptUpper = String(finalSelection[0] || '').toUpperCase();
-    if (firstOptUpper === 'YES' || firstOptUpper.includes('YES')) {
-      runPlayAction(() => answerYesSessionApi(tournamentId, activeSessionId, payload));
-    } else if (firstOptUpper === 'NO' || firstOptUpper.includes('NO')) {
-      runPlayAction(() => answerNoSessionApi(tournamentId, activeSessionId, payload));
-    } else {
-      runPlayAction(() => answerYesSessionApi(tournamentId, activeSessionId, payload));
-    }
+    runPlayAction(() =>
+      answerYesSessionApi(tournamentId, activeSessionId, { questionId: id }),
+    );
   };
 
-  const handleSelectYes = () => {
-    handleSubmitAnswer('YES');
-  };
-
-  const handleSelectNo = () => {
-    handleSubmitAnswer('NO');
+  const handleAnswerNo = () => {
+    runPlayAction(() => answerNoSessionApi(tournamentId, activeSessionId, {}));
   };
 
   const handleConfirmInstruction = () => {
@@ -1938,6 +1842,23 @@ const ActiveGameScreen = ({ navigation, route }) => {
       playMode: playModeParam,
       gameNumber: playMeta.gameNumber || route?.params?.gameNumber || 1,
       sessionId: activeSessionId,
+    });
+  };
+
+  const handleStartNextGame = () => {
+    if (nextGameNumber == null) return;
+    setShowGameEndModal(false);
+    const playMode =
+      String(playModeParam || playMeta.playMode || 'practice').toLowerCase() === 'challenge'
+        ? 'challenge'
+        : 'practice';
+    navigation.navigate('SelectGame', {
+      tournament,
+      selectedTeam,
+      players,
+      playMode,
+      gameNumber: nextGameNumber,
+      selectedGameIndex: Math.max(0, nextGameNumber - 1),
     });
   };
 
@@ -2043,22 +1964,22 @@ const ActiveGameScreen = ({ navigation, route }) => {
           </View>
         ) : null}
 
-        {/* QUESTIONS SCREEN with Question */}
-        {playScreen === 'QUESTIONS' && (hasQuestion || (questionList && questionList.length > 0)) ? (
+        {playScreen === 'QUESTIONS' && questionList.length > 0 ? (
           <>
             <Text style={styles.questionSectionHeader}>
               {promptText || 'After playing your shot…'}
             </Text>
 
-            {(answerMode === 'YES_ONLY' || (questionList.length > 1 && !activeQuestion?.isMultiSelect && (!activeQuestion?.options || activeQuestion?.options.length <= 2))) ? (
-              /* YES_ONLY Mode / Multiple Question Group List (Matches Screenshot 1 Design) */
+            {answerMode === 'YES_ONLY' ? (
               <View style={styles.questionCard}>
                 {questionList.map((qItem, idx) => (
                   <View key={qItem.id || `q-${idx}`} style={styles.yesOnlyGroupWrap}>
-                    <Text style={styles.yesOnlyQuestionText}>{qItem.text || qItem.question}</Text>
+                    <Text style={styles.yesOnlyQuestionText}>
+                      {qItem.text || qItem.question}
+                    </Text>
                     <TouchableOpacity
                       style={styles.yesOnlyFullBtn}
-                      onPress={() => runPlayAction(() => answerYesSessionApi(tournamentId, activeSessionId, { questionId: qItem.id }))}
+                      onPress={() => handleAnswerYes(qItem.id || qItem._id || qItem.questionId)}
                       disabled={actionLoading}
                       activeOpacity={0.85}
                     >
@@ -2067,156 +1988,71 @@ const ActiveGameScreen = ({ navigation, route }) => {
                   </View>
                 ))}
 
-                {/* None of these — play another shot button */}
-                <TouchableOpacity
-                  style={styles.noneOfTheseBtn}
-                  onPress={() => runPlayAction(() => answerNoSessionApi(tournamentId, activeSessionId, {}))}
-                  disabled={actionLoading}
-                  activeOpacity={0.88}
-                >
-                  <Text style={styles.noneOfTheseBtnText}>None of these — play another shot</Text>
-                </TouchableOpacity>
+                {allowNo ? (
+                  <TouchableOpacity
+                    style={styles.noneOfTheseBtn}
+                    onPress={handleAnswerNo}
+                    disabled={actionLoading}
+                    activeOpacity={0.88}
+                  >
+                    <Text style={styles.noneOfTheseBtnText}>
+                      None of these — play another shot
+                    </Text>
+                  </TouchableOpacity>
+                ) : null}
               </View>
             ) : (
-              /* Single Question or Multi-Select Checkbox list */
               <View style={styles.questionCard}>
-                <View style={styles.questionHeaderWrap}>
-                  <Text style={styles.questionText}>
-                    {questionText}
-                    {activeQuestion?.isRequired ? <Text style={styles.requiredStar}> *</Text> : null}
+                {hiddenQuestionCount > 0 ? (
+                  <Text style={styles.hiddenQuestionHint}>
+                    On the green or holed out? Tap No to see those options.
                   </Text>
-                  {activeQuestion?.isMultiSelect ? (
-                    <Text style={styles.multiInstructionText}>
-                      (Select all answers that apply)
-                    </Text>
+                ) : null}
+                <Text style={styles.questionText}>{questionText}</Text>
+                <View style={styles.yesNoRow}>
+                  <TouchableOpacity
+                    style={styles.yesBtn}
+                    onPress={() => handleAnswerYes(activeQuestionId)}
+                    disabled={actionLoading}
+                    activeOpacity={0.85}
+                  >
+                    <Text style={styles.yesBtnText}>Yes</Text>
+                  </TouchableOpacity>
+                  {allowNo ? (
+                    <TouchableOpacity
+                      style={styles.noBtn}
+                      onPress={handleAnswerNo}
+                      disabled={actionLoading}
+                      activeOpacity={0.85}
+                    >
+                      <Text style={styles.noBtnText}>No</Text>
+                    </TouchableOpacity>
                   ) : null}
                 </View>
-
-                {/* Options List for Custom / Multi-Select questions */}
-                {activeQuestion?.options && activeQuestion.options.length > 2 ? (
-                  <View style={styles.optionsListContainer}>
-                    {activeQuestion.options.map((opt) => {
-                      const isSelected = selectedOptionIds.includes(opt.id);
-                      return (
-                        <TouchableOpacity
-                          key={opt.id}
-                          style={[
-                            styles.optionRow,
-                            isSelected && styles.optionRowSelected,
-                          ]}
-                          onPress={() => handleToggleOption(opt.id)}
-                          disabled={actionLoading}
-                          activeOpacity={0.8}
-                        >
-                          <View
-                            style={[
-                              activeQuestion.isMultiSelect
-                                ? styles.checkboxSquare
-                                : styles.radioCircle,
-                              isSelected && styles.optionControlSelected,
-                            ]}
-                          >
-                            {isSelected ? (
-                              <AuthIcon
-                                name="check"
-                                size={moderateScale(12)}
-                                color={activeQuestion.isMultiSelect ? '#093A24' : '#BCFF00'}
-                              />
-                            ) : null}
-                          </View>
-                          <Text
-                            style={[
-                              styles.optionText,
-                              isSelected && styles.optionTextSelected,
-                            ]}
-                          >
-                            {opt.text}
-                          </Text>
-                        </TouchableOpacity>
-                      );
-                    })}
-
-                    <TouchableOpacity
-                      style={styles.submitAnswerBtn}
-                      onPress={() => handleSubmitAnswer()}
-                      disabled={actionLoading}
-                      activeOpacity={0.88}
-                    >
-                      <Text style={styles.submitAnswerBtnText}>SUBMIT ANSWER</Text>
-                    </TouchableOpacity>
-                  </View>
-                ) : (
-                  /* Default Yes/No 2-option rendering with selection support */
-                  <View style={styles.yesNoContainer}>
-                    <View style={styles.yesNoRow}>
-                      {activeQuestion?.options?.map((opt) => {
-                        const isSelected = selectedOptionIds.includes(opt.id);
-                        const isYes = String(opt.id).toUpperCase() === 'YES' || String(opt.text).toUpperCase() === 'YES';
-                        return (
-                          <TouchableOpacity
-                            key={opt.id}
-                            style={[
-                              isYes ? styles.yesBtn : styles.noBtn,
-                              isSelected && (isYes ? styles.yesBtnSelected : styles.noBtnSelected),
-                            ]}
-                            onPress={() => {
-                              if (activeQuestion?.isMultiSelect) {
-                                handleToggleOption(opt.id);
-                              } else {
-                                handleToggleOption(opt.id);
-                                handleSubmitAnswer(opt.id);
-                              }
-                            }}
-                            disabled={actionLoading}
-                            activeOpacity={0.85}
-                          >
-                            <Text
-                              style={[
-                                isYes ? styles.yesBtnText : styles.noBtnText,
-                                isSelected && (isYes ? styles.yesBtnTextSelected : styles.noBtnTextSelected),
-                              ]}
-                            >
-                              {opt.text}
-                            </Text>
-                          </TouchableOpacity>
-                        );
-                      })}
-                    </View>
-                    {activeQuestion?.isMultiSelect ? (
-                      <TouchableOpacity
-                        style={styles.submitAnswerBtn}
-                        onPress={() => handleSubmitAnswer()}
-                        disabled={actionLoading}
-                        activeOpacity={0.88}
-                      >
-                        <Text style={styles.submitAnswerBtnText}>SUBMIT ANSWER</Text>
-                      </TouchableOpacity>
-                    ) : null}
-                  </View>
-                )}
               </View>
             )}
           </>
         ) : null}
 
-        {/* QUESTIONS SCREEN without Question */}
-        {playScreen === 'QUESTIONS' && !hasQuestion ? (
+        {playScreen === 'QUESTIONS' && questionList.length === 0 ? (
           <>
             <Text style={styles.questionSectionHeader}>{promptText || 'Question'}</Text>
             <View style={styles.questionCard}>
               <Text style={styles.questionText}>No question here</Text>
               <Text style={styles.noQuestionDescription}>
                 {promptText ||
-                  'No questions for this location/par. Try the next set or go back one step.'}
+                  'No Shot Flow question for this stage. Go back or check Shot Flow.'}
               </Text>
-              <TouchableOpacity
-                style={styles.nextShotBtn}
-                onPress={handleSelectNo}
-                disabled={actionLoading}
-                activeOpacity={0.88}
-              >
-                <Text style={styles.nextShotBtnText}>TRY NEXT QUESTIONS</Text>
-              </TouchableOpacity>
+              {allowNo ? (
+                <TouchableOpacity
+                  style={styles.nextShotBtn}
+                  onPress={handleAnswerNo}
+                  disabled={actionLoading}
+                  activeOpacity={0.88}
+                >
+                  <Text style={styles.nextShotBtnText}>TRY NEXT QUESTIONS</Text>
+                </TouchableOpacity>
+              ) : null}
             </View>
           </>
         ) : null}
@@ -2248,6 +2084,15 @@ const ActiveGameScreen = ({ navigation, route }) => {
                 Game {playMeta.gameNumber || 1} complete for this nine.
               </Text>
               <Text style={styles.finalScoreText}>Your Final score: {score}</Text>
+              {nextGameNumber != null ? (
+                <TouchableOpacity
+                  style={[styles.nextShotBtn, { marginBottom: hp(1.2) }]}
+                  onPress={handleStartNextGame}
+                  activeOpacity={0.88}
+                >
+                  <Text style={styles.nextShotBtnText}>START GAME {nextGameNumber}</Text>
+                </TouchableOpacity>
+              ) : null}
               <TouchableOpacity
                 style={styles.nextShotBtn}
                 onPress={handleCheckScore}
@@ -2304,6 +2149,16 @@ const ActiveGameScreen = ({ navigation, route }) => {
             </Text>
 
             <Text style={styles.modalScoreText}>Your Final score: {score}</Text>
+
+            {nextGameNumber != null ? (
+              <TouchableOpacity
+                style={styles.modalStartNextBtn}
+                onPress={handleStartNextGame}
+                activeOpacity={0.85}
+              >
+                <Text style={styles.modalSolidBtnText}>START GAME {nextGameNumber}</Text>
+              </TouchableOpacity>
+            ) : null}
 
             <View style={styles.modalBtnRow}>
               <TouchableOpacity
@@ -2521,8 +2376,15 @@ const styles = StyleSheet.create({
     fontFamily: FONTS.medium,
     fontSize: fontSize(13.5),
     color: '#093A24',
-    marginBottom: hp(0.5),
+    marginBottom: hp(1.2),
     lineHeight: fontSize(20),
+  },
+  hiddenQuestionHint: {
+    fontFamily: FONTS.medium,
+    fontSize: fontSize(12),
+    color: '#718096',
+    lineHeight: fontSize(17),
+    marginBottom: hp(1.2),
   },
   questionHeaderWrap: {
     marginBottom: hp(1.2),
@@ -2632,37 +2494,40 @@ const styles = StyleSheet.create({
   },
   yesNoRow: {
     flexDirection: 'row',
+    alignItems: 'stretch',
     gap: wp(3),
   },
   yesBtn: {
+    flex: 1,
     backgroundColor: '#BCFF00',
     borderRadius: moderateScale(20),
-    paddingHorizontal: wp(6),
-    paddingVertical: hp(1.2),
+    paddingHorizontal: wp(3),
+    paddingVertical: hp(1.4),
     justifyContent: 'center',
     alignItems: 'center',
-    minWidth: wp(25),
   },
   yesBtnText: {
     fontFamily: FONTS.bold,
     fontSize: fontSize(13),
     color: '#093A24',
+    textAlign: 'center',
   },
   noBtn: {
+    flex: 1,
     backgroundColor: COLORS.white,
     borderWidth: 1.5,
     borderColor: '#093A24',
     borderRadius: moderateScale(20),
-    paddingHorizontal: wp(6),
-    paddingVertical: hp(1.2),
+    paddingHorizontal: wp(3),
+    paddingVertical: hp(1.4),
     justifyContent: 'center',
     alignItems: 'center',
-    minWidth: wp(25),
   },
   noBtnText: {
     fontFamily: FONTS.bold,
-    fontSize: fontSize(13),
+    fontSize: fontSize(12.5),
     color: '#093A24',
+    textAlign: 'center',
   },
   nextShotBtn: {
     backgroundColor: '#BCFF00',
@@ -2801,6 +2666,15 @@ const styles = StyleSheet.create({
     fontSize: fontSize(14.5),
     color: '#2EA200',
     marginBottom: hp(2.5),
+  },
+  modalStartNextBtn: {
+    width: '100%',
+    backgroundColor: '#BCFF00',
+    borderRadius: moderateScale(24),
+    height: hp(5.5),
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: hp(1.2),
   },
   modalBtnRow: {
     flexDirection: 'row',

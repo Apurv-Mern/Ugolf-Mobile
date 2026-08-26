@@ -429,6 +429,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
+import { useSelector } from 'react-redux';
 
 import AuthButton from '../../components/common/AuthButton';
 import AuthIcon from '../../components/common/AuthIcon';
@@ -441,11 +442,16 @@ const tournamentBg = require('../../assets/Images/tournament_bg.jpg');
 const isUuid = (id) => typeof id === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
 
 const LeaderboardScreen = ({ navigation, route }) => {
+  const currentUser = useSelector((state) => state.auth?.user);
+  const currentUserId = currentUser?.id || currentUser?._id || currentUser?.userId;
   const tournament = route?.params?.tournament;
   const tournamentId = tournament?.id || tournament?._id;
   const playMode = route?.params?.playMode || tournament?.playMode || 'practice';
-  const gameNumber = route?.params?.gameNumber || 1;
 
+  const [selectedGame, setSelectedGame] = useState(Number(route?.params?.gameNumber) || 1);
+  const [numberOfGames, setNumberOfGames] = useState(
+    Math.max(1, Number(tournament?.numberOfGames) || 1),
+  );
   const [entries, setEntries] = useState([]);
   const [meta, setMeta] = useState({
     tournamentName: tournament?.name || tournament?.title || 'Tournament',
@@ -469,21 +475,39 @@ const LeaderboardScreen = ({ navigation, route }) => {
     }
     try {
       setLoading(true);
-      const res = await getTournamentLeaderboardApi(tournamentId);
-      setMeta({
-        tournamentName: res?.tournamentName || tournament?.name || tournament?.title || 'Tournament',
-        playMode: res?.playMode || playMode,
+      const res = await getTournamentLeaderboardApi(tournamentId, {
+        gameNumber: selectedGame,
+        view: 'game',
       });
-      const list = res?.entries || res?.data?.entries || [];
+      const data = res?.data || res;
+      const gamesCount = Number(data?.numberOfGames) || Number(tournament?.numberOfGames) || 1;
+      setNumberOfGames(Math.max(1, gamesCount));
+      setMeta({
+        tournamentName: data?.tournamentName || tournament?.name || tournament?.title || 'Tournament',
+        playMode: data?.playMode || playMode,
+      });
+      const list = data?.entries || res?.entries || [];
+      const practicePb =
+        data?.practice?.personalBest ??
+        data?.practice?.lastTournamentBest ??
+        null;
       setEntries(
-        (Array.isArray(list) ? list : []).map((e, idx) => ({
-          rank: e.rank || idx + 1,
-          name: e.playerName || e.name || 'Player',
-          roundScore: e.score ?? 0,
-          personalBest: e.currentHole != null ? `H${e.currentHole}` : e.status || '—',
-          isYou: !!e.isYou || idx === 0,
-          avatarUrl: e.avatarUrl || e.avatar || e.image || null,
-        })),
+        (Array.isArray(list) ? list : []).map((e, idx) => {
+          const playerId = e.playerUserId || e.userId || e.id;
+          const isYou = Boolean(
+            currentUserId && playerId && String(playerId) === String(currentUserId),
+          );
+          const entryPb = e.personalBest ?? e.lastTournamentBest ?? e.lastScore;
+          const pb = entryPb ?? (isYou ? practicePb : null);
+          return {
+            rank: e.rank || idx + 1,
+            name: e.playerName || e.name || 'Player',
+            roundScore: e.score ?? 0,
+            personalBest: pb != null && pb !== '' ? String(pb) : '—',
+            isYou,
+            avatarUrl: e.avatarUrl || e.avatar || e.image || null,
+          };
+        }),
       );
     } catch (err) {
       console.log('Leaderboard load error:', err);
@@ -491,7 +515,7 @@ const LeaderboardScreen = ({ navigation, route }) => {
     } finally {
       setLoading(false);
     }
-  }, [tournamentId, playMode, tournament]);
+  }, [tournamentId, playMode, tournament, selectedGame, currentUserId]);
 
   useFocusEffect(
     useCallback(() => {
@@ -526,11 +550,35 @@ const LeaderboardScreen = ({ navigation, route }) => {
           <View style={styles.headerOverlay} />
           <Text style={styles.bannerTitle}>Leaderboard</Text>
           <Text style={styles.bannerSubtitle}>
-            Game {gameNumber} · {modeLabel} · {meta.tournamentName}
+            Game {selectedGame} · {modeLabel} · {meta.tournamentName}
           </Text>
         </ImageBackground>
 
         <View style={styles.contentContainer}>
+          {numberOfGames > 1 ? (
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.gameTabs}
+            >
+              {Array.from({ length: numberOfGames }, (_, i) => i + 1).map((n) => {
+                const active = selectedGame === n;
+                return (
+                  <TouchableOpacity
+                    key={n}
+                    style={[styles.gameTab, active && styles.gameTabActive]}
+                    onPress={() => setSelectedGame(n)}
+                    activeOpacity={0.85}
+                  >
+                    <Text style={[styles.gameTabText, active && styles.gameTabTextActive]}>
+                      Game {n}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+          ) : null}
+
           {loading ? (
             <ActivityIndicator color="#093A24" style={{ marginTop: hp(4) }} />
           ) : (
@@ -640,6 +688,30 @@ const styles = StyleSheet.create({
   contentContainer: {
     paddingHorizontal: wp(5),
     paddingTop: hp(2.5),
+  },
+  gameTabs: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: wp(2),
+    marginBottom: hp(2),
+    paddingRight: wp(2),
+  },
+  gameTab: {
+    borderRadius: moderateScale(20),
+    paddingHorizontal: wp(4),
+    paddingVertical: hp(0.8),
+    backgroundColor: '#EDF2F7',
+  },
+  gameTabActive: {
+    backgroundColor: '#0E3B2E',
+  },
+  gameTabText: {
+    fontFamily: FONTS.bold,
+    fontSize: fontSize(12.5),
+    color: '#093A24',
+  },
+  gameTabTextActive: {
+    color: '#BCFF00',
   },
 
   // Table Headers

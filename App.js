@@ -33,6 +33,7 @@ import NotificationsScreen from './src/screens/Notification/NotificationsScreen'
 import EditProfileScreen from './src/screens/Profile/EditProfileScreen';
 import AddPlayersScreen from './src/screens/Play/AddPlayersScreen';
 import TournamentHistoryScreen from './src/screens/Profile/TournamentHistoryScreen';
+import CompletedTournamentGamesScreen from './src/screens/Profile/CompletedTournamentGamesScreen';
 import InProgressGamesScreen from './src/screens/Play/InProgressGamesScreen';
 import YourTeamScreen from './src/screens/Profile/YourTeamScreen';
 import ChoosePlanScreen from './src/screens/Subscription/ChoosePlanScreen';
@@ -234,6 +235,11 @@ function App() {
             <Stack.Screen
               name="TournamentHistory"
               component={TournamentHistoryScreen}
+              options={{ animation: 'slide_from_right' }}
+            />
+            <Stack.Screen
+              name="CompletedTournamentGames"
+              component={CompletedTournamentGamesScreen}
               options={{ animation: 'slide_from_right' }}
             />
             <Stack.Screen

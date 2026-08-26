@@ -750,6 +750,7 @@ const SelectGameScreen = ({ navigation, route }) => {
   const [error, setError] = useState(null);
 
   const isMounted = useRef(true);
+  const userPickedGame = useRef(false);
   useEffect(() => {
     isMounted.current = true;
     return () => {
@@ -841,15 +842,17 @@ const SelectGameScreen = ({ navigation, route }) => {
       if (!isMounted.current) return;
       setReadiness(data);
 
-      // Follow the server: resume an in-progress game, else jump to the next unplayed one.
-      const resumeGame = data?.activeSession?.gameNumber;
-      const completedList = data?.completedGameNumbers || [];
-      if (resumeGame != null && Number(resumeGame) !== gameNumber) {
-        setGameNumber(Number(resumeGame));
-        setExpanded(Number(resumeGame));
-      } else if (completedList.includes(gameNumber) && data?.nextGameNumber != null) {
-        setGameNumber(Number(data.nextGameNumber));
-        setExpanded(Number(data.nextGameNumber));
+      // Auto-advance only until the player picks a game from the list.
+      if (!userPickedGame.current) {
+        const resumeGame = data?.activeSession?.gameNumber;
+        const completedList = (data?.completedGameNumbers || []).map(Number);
+        if (resumeGame != null && Number(resumeGame) !== gameNumber) {
+          setGameNumber(Number(resumeGame));
+          setExpanded(Number(resumeGame));
+        } else if (completedList.includes(Number(gameNumber)) && data?.nextGameNumber != null) {
+          setGameNumber(Number(data.nextGameNumber));
+          setExpanded(Number(data.nextGameNumber));
+        }
       }
     } catch (err) {
       console.log('Select game — readiness error:', err);
@@ -889,7 +892,7 @@ const SelectGameScreen = ({ navigation, route }) => {
     readiness?.playMode || route?.params?.playMode || tournament?.playMode || '',
   ).toUpperCase();
   const isChallenge = playMode === 'CHALLENGE';
-  const completed = readiness?.completedGameNumbers || [];
+  const completed = (readiness?.completedGameNumbers || []).map(Number);
   const reasons = (readiness?.reasons || []).filter(Boolean);
 
   const isCurrentGameCompleted = completed.includes(gameNumber);
@@ -900,6 +903,17 @@ const SelectGameScreen = ({ navigation, route }) => {
         type: 'info',
         text1: 'Game Completed',
         text2: `Game ${gameNumber} is already completed and cannot be replayed.`,
+      });
+      return;
+    }
+
+    if (isChallenge && readiness?.opponentReady === false && !activeSession) {
+      Toast.show({
+        type: 'error',
+        text1: 'Waiting for Opponent',
+        text2:
+          reasons.join('. ') ||
+          'Waiting for the invited opponent team to accept before Start Game.',
       });
       return;
     }
@@ -915,7 +929,13 @@ const SelectGameScreen = ({ navigation, route }) => {
       return;
     }
 
-    const startGameNumber = Number(activeSession?.gameNumber ?? gameNumber) || 1;
+    const startGameNumber =
+      Number(
+        activeSession?.gameNumber ??
+          (completed.includes(gameNumber) ? readiness?.nextGameNumber : gameNumber) ??
+          readiness?.nextGameNumber ??
+          gameNumber,
+      ) || 1;
     navigation.navigate('GameRules', {
       ...route?.params,
       tournament,
@@ -1066,6 +1086,7 @@ const SelectGameScreen = ({ navigation, route }) => {
         <TouchableOpacity
           style={styles.gameCardHeader}
           onPress={() => {
+            userPickedGame.current = true;
             setExpanded(isOpen ? null : game.gameNumber);
             setGameNumber(game.gameNumber);
           }}
@@ -1074,9 +1095,13 @@ const SelectGameScreen = ({ navigation, route }) => {
           <View style={styles.gameTitleRow}>
             <Text style={styles.gameTitle}>Game Number {game.gameNumber}</Text>
             {isActive ? (
-              <Text style={styles.tagActive}>IN PROGRESS</Text>
+              <View style={[styles.badge, styles.badgeReady]}>
+                <Text style={[styles.badgeText, styles.badgeTextReady]}>IN PROGRESS</Text>
+              </View>
             ) : isDone ? (
-              <Text style={styles.tagDone}>Done</Text>
+              <View style={[styles.badge, styles.badgeCompleted]}>
+                <Text style={[styles.badgeText, styles.badgeTextCompleted]}>COMPLETED</Text>
+              </View>
             ) : null}
           </View>
           <AuthIcon
@@ -1136,8 +1161,6 @@ const SelectGameScreen = ({ navigation, route }) => {
       >
         {renderReadinessCard()}
 
-        {/* Game selection cards commented out as selection is already handled on ConfigureGames screen */}
-        {/*
         {loadingGames ? (
           <ActivityIndicator
             size="large"
@@ -1147,7 +1170,6 @@ const SelectGameScreen = ({ navigation, route }) => {
         ) : (
           games.map(renderGameCard)
         )}
-        */}
       </ScrollView>
 
       <View style={styles.btnFixedBottom}>
@@ -1363,16 +1385,11 @@ const styles = StyleSheet.create({
     fontSize: fontSize(15),
     color: COLORS.textPrimary,
   },
-  tagDone: {
-    fontFamily: FONTS.medium,
-    fontSize: fontSize(10),
-    color: COLORS.textMuted,
+  badgeCompleted: {
+    backgroundColor: 'rgba(14, 59, 46, 0.12)',
   },
-  tagActive: {
-    fontFamily: FONTS.bold,
-    fontSize: fontSize(10),
-    color: '#5C8A00',
-    letterSpacing: 0.5,
+  badgeTextCompleted: {
+    color: '#093A24',
   },
   gameCardBody: {
     paddingHorizontal: wp(4),

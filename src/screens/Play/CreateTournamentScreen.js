@@ -772,13 +772,20 @@ const CreateTournamentScreen = ({ navigation, route }) => {
         return 'INVITE_ONLY';
       };
 
-      const playModeParam = route?.params?.playMode ? String(route.params.playMode).toUpperCase() : 'PRACTICE';
+      const rawPlayMode = isEditing
+        ? (tournamentParam?.playMode || tournamentParam?.mode || route?.params?.playMode)
+        : route?.params?.playMode;
+      const playModeParam = String(rawPlayMode || 'PRACTICE').toUpperCase().includes('CHALLENGE')
+        ? 'CHALLENGE'
+        : 'PRACTICE';
       // Admin mobile-flow: Practice defaults to teamSize 5; Challenge uses selected size
-      const teamSizeParam = route?.params?.teamSize
-        ? parseInt(route.params.teamSize, 10)
-        : playModeParam === 'PRACTICE'
-          ? 5
-          : 4;
+      const teamSizeParam = tournamentParam?.teamSize
+        ? parseInt(tournamentParam.teamSize, 10)
+        : route?.params?.teamSize
+          ? parseInt(route.params.teamSize, 10)
+          : playModeParam === 'PRACTICE'
+            ? 5
+            : 4;
 
       const matchedClub = clubsList.find((c) => (c.clubName || c.name || '').toLowerCase() === String(golfClub).toLowerCase());
       const resolvedClubId = golfClubId || matchedClub?.clubId || matchedClub?.id || matchedClub?._id || '';
@@ -869,10 +876,11 @@ const CreateTournamentScreen = ({ navigation, route }) => {
             text2: 'Please configure courses for the new golf club.',
           });
           navigation.navigate('ConfigureGames', {
+            ...route?.params,
             tournament: formattedT,
             isCreator: true,
             isEditing: true,
-            ...route?.params,
+            playMode: String(playModeParam).toLowerCase(),
           });
           return;
         }
