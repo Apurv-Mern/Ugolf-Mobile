@@ -558,6 +558,7 @@ import { getTournamentsApi, getTournamentByIdApi } from '../../services/homeServ
 import { getTournamentTeamsApi, getTeamsApi, getTeamByIdApi } from '../../services/teamService';
 import { getStartGameReadinessApi } from '../../services/playService';
 import { shareTournamentLink } from '../../utils/shareUtils';
+import { classifyTournamentPlay, unwrapReadiness } from '../../utils/playProgress';
 
 import AuthButton from '../../components/common/AuthButton';
 import AuthIcon from '../../components/common/AuthIcon';
@@ -714,7 +715,6 @@ const SelectTournamentScreen = ({ navigation, route }) => {
           combinedMap.set(String(id), { ...item, isMine: false, source: 'invited' });
         }
       });
-
       const tournamentList = Array.from(combinedMap.values());
 
       const formatted = tournamentList.map((item, index) => {
@@ -770,30 +770,18 @@ const SelectTournamentScreen = ({ navigation, route }) => {
       const finalFormatted = formatted.map((item, idx) => {
         const res =
           readinessResults[idx]?.status === 'fulfilled'
-            ? readinessResults[idx]?.value?.data || readinessResults[idx]?.value
+            ? unwrapReadiness(readinessResults[idx]?.value)
             : null;
-        const hasActiveSession = Boolean(res?.activeSession?.id || res?.activeSession?.gameNumber);
-        const completedCount = Array.isArray(res?.completedGameNumbers) ? res.completedGameNumbers.length : 0;
-        const totalGames = Number(item.numberOfGames) || 1;
-        const allGamesDone = completedCount >= totalGames && totalGames > 0;
-        const statusUpper = String(item.status || '').toUpperCase();
-
-        const isCompleted = item.isCompleted === true || item.completed === true || allGamesDone || statusUpper === 'COMPLETED';
-        const isInProgress =
-          !isCompleted &&
-          (hasActiveSession ||
-            completedCount > 0 ||
-            statusUpper === 'IN_PROGRESS' ||
-            statusUpper === 'ACTIVE' ||
-            item.isStarted === true ||
-            item.hasStarted === true);
+        const play = classifyTournamentPlay(item, res);
 
         return {
           ...item,
-          isInProgress,
-          isCompleted,
-          hasActiveSession,
-          activeSession: res?.activeSession,
+          isInProgress: play.isInProgress,
+          isCompleted: play.isCompleted,
+          hasActiveSession: play.hasActiveSession,
+          activeSession: play.activeSession,
+          nextGameNumber: play.nextGameNumber,
+          numberOfGames: play.numberOfGames,
         };
       });
 
@@ -941,7 +929,11 @@ const SelectTournamentScreen = ({ navigation, route }) => {
                       navigation.navigate('CreateTournament', {
                         tournament: item,
                         isEditing: true,
-                        ...route?.params,
+                        playMode: String(item.playMode || route?.params?.playMode || 'practice')
+                          .toLowerCase()
+                          .includes('challenge')
+                          ? 'challenge'
+                          : 'practice',
                       })
                     }
                     activeOpacity={0.7}
@@ -1064,12 +1056,25 @@ const SelectTournamentScreen = ({ navigation, route }) => {
           onPress={() => {
             const selectedT = tournaments.find(t => t.id === selectedTournamentId);
             if (selectedT) {
+              const playMode =
+                (selectedT.playMode || route?.params?.playMode || 'practice').toLowerCase() ===
+                'challenge'
+                  ? 'challenge'
+                  : 'practice';
               if (selectedT.isInProgress && selectedT.activeSession?.id) {
                 navigation.navigate('ActiveGame', {
                   tournament: selectedT,
                   sessionId: selectedT.activeSession.id,
-                  gameNumber: Number(selectedT.activeSession.gameNumber) || 1,
-                  playMode: (selectedT.playMode || route?.params?.playMode || 'practice').toLowerCase() === 'challenge' ? 'challenge' : 'practice',
+                  gameNumber: Number(selectedT.activeSession.gameNumber) || selectedT.nextGameNumber || 1,
+                  playMode,
+                });
+              } else if (selectedT.isInProgress) {
+                navigation.navigate('SelectGame', {
+                  ...route?.params,
+                  tournament: selectedT,
+                  playMode,
+                  gameNumber: selectedT.nextGameNumber || 1,
+                  selectedGameIndex: Math.max(0, (selectedT.nextGameNumber || 1) - 1),
                 });
               } else {
                 navigation.navigate('ConfigureGames', {

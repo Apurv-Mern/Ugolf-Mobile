@@ -279,7 +279,7 @@ const SelectTeamScreen = ({ navigation, route }) => {
               if (navigation.canGoBack()) {
                 navigation.goBack();
               } else {
-                navigation.navigate('Home');
+                navigation.navigate('MainApp');
               }
             }}
             activeOpacity={0.7}

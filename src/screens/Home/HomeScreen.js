@@ -2204,6 +2204,7 @@ import { formatDisplayDate } from '../../utils/dateUtils';
 
 const homescreenBg = require('../../assets/Images/homescreen_bg.jpg');
 const trophyImg = require('../../assets/Images/ trophy.png');
+const editIcon = require('../../assets/Images/edit.png');
 
 import AuthIcon from '../../components/common/AuthIcon';
 import DotPattern from '../../components/common/DotPattern';
@@ -2216,6 +2217,12 @@ import {
   getGameSessionApi,
 } from '../../services/playService';
 import { shareTournamentLink } from '../../utils/shareUtils';
+import {
+  classifyTournamentPlay,
+  groupGameHistoryByTournament,
+  inProgressActivityMs,
+  unwrapReadiness,
+} from '../../utils/playProgress';
 
 // ─── Bottom Tab Icons ────────────────────────────────────────────────────────
 const TAB_ITEMS = [
@@ -2233,6 +2240,7 @@ const HomeScreen = ({ navigation }) => {
   const [userInfo, setUserInfo] = useState(reduxUser);
   const [tournaments, setTournaments] = useState([]);
   const [gameHistory, setGameHistory] = useState([]);
+  const [completedHistory, setCompletedHistory] = useState([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [totalPoints, setTotalPoints] = useState(0);
   const [lastBest, setLastBest] = useState(0);
@@ -2337,94 +2345,79 @@ const HomeScreen = ({ navigation }) => {
     return Array.isArray(raw) ? raw : [];
   };
 
-  const loadLiveRound = useCallback(async (list) => {
-    const candidates = list.filter((item) => item.tournament?.id);
-
-    if (candidates.length === 0) {
-      setLiveRound(null);
-      return;
-    }
-
-    const results = await Promise.all(
-      candidates.map((item) =>
-        getStartGameReadinessApi(item.tournament.id)
-          .then((res) => res?.data || res)
-          .catch(() => null),
-      ),
-    );
-
-    let foundIdx = -1;
-    let latestTimestamp = -1;
-
-    results.forEach((r, idx) => {
-      if (r?.activeSession?.id) {
-        const t = candidates[idx]?.tournament || {};
-        const timeVal = t.updatedAt
-          ? new Date(t.updatedAt).getTime()
-          : t.updated_at
-            ? new Date(t.updated_at).getTime()
-            : t.createdAt
-              ? new Date(t.createdAt).getTime()
-              : t.created_at
-                ? new Date(t.created_at).getTime()
-                : t.created
-                  ? new Date(t.created).getTime()
-                  : candidates[idx]?.startDateMs || 0;
-
-        if (foundIdx === -1 || timeVal > latestTimestamp) {
-          latestTimestamp = timeVal;
-          foundIdx = idx;
-        }
-      }
-    });
-
-    if (foundIdx === -1) {
-      setLiveRound(null);
-      return;
-    }
-
-    const item = candidates[foundIdx];
-    const session = results[foundIdx].activeSession;
-    const sessionRes = await getGameSessionApi(item.tournament.id, session.id)
-      .then((res) => res?.play || res?.data?.play || res?.data || res)
-      .catch(() => null);
-
-    const holeStart = Number(sessionRes?.holeStart) || 1;
-    const holeEnd = Number(sessionRes?.holeEnd) || 18;
-    const totalHoles = Math.max(1, holeEnd - holeStart + 1);
-    const holeIndex = Math.min(
-      totalHoles,
-      Math.max(1, (Number(session.currentHole) || holeStart) - holeStart + 1),
-    );
-    const courseName = sessionRes?.golfCourseName || item.location || item.title;
-    const nineLabel =
-      totalHoles === 9 ? (holeStart <= 9 ? 'Front 9' : 'Back 9') : `${totalHoles} holes`;
-
+  const buildLiveRoundCard = useCallback(async (item) => {
     const tournamentName =
-      item.tournament?.name ||
-      item.tournament?.title ||
-      item.title ||
-      sessionRes?.tournamentName ||
-      '';
+      item.tournament?.name || item.tournament?.title || item.title || '';
+    const playMode = item.playMode;
+    const nextGameNumber = item.nextGameNumber;
+    const numberOfGames = item.numberOfGames || 1;
+    const completedCount = item.completedCount || 0;
 
-    setLiveRound({
+    if (item.hasActiveSession && item.activeSession?.id) {
+      const session = item.activeSession;
+      const sessionRes = await getGameSessionApi(item.tournament.id, session.id)
+        .then((res) => res?.play || res?.data?.play || res?.data || res)
+        .catch(() => null);
+
+      const holeStart = Number(sessionRes?.holeStart) || 1;
+      const holeEnd = Number(sessionRes?.holeEnd) || 18;
+      const totalHoles = Math.max(1, holeEnd - holeStart + 1);
+      const holeIndex = Math.min(
+        totalHoles,
+        Math.max(1, (Number(session.currentHole) || holeStart) - holeStart + 1),
+      );
+      const courseName = sessionRes?.golfCourseName || item.location || item.title;
+      const nineLabel =
+        totalHoles === 9 ? (holeStart <= 9 ? 'Front 9' : 'Back 9') : `${totalHoles} holes`;
+
+      return {
+        tournament: item.tournament,
+        tournamentName,
+        playMode,
+        sessionId: session.id,
+        gameNumber: Number(session.gameNumber) || nextGameNumber || 1,
+        nextGameNumber,
+        numberOfGames,
+        hasActiveSession: true,
+        title: courseName ? `${courseName} — ${nineLabel}` : nineLabel,
+        holeLabel: `Hole ${holeIndex} / ${totalHoles}`,
+        holeIndex,
+        totalHoles,
+        progress: holeIndex / totalHoles,
+        badge: 'LIVE ROUND',
+        actionLabel: `CONTINUE GAME ${Number(session.gameNumber) || nextGameNumber || 1}`,
+      };
+    }
+
+    return {
       tournament: item.tournament,
       tournamentName,
-      playMode: item.playMode,
-      sessionId: session.id,
-      gameNumber: Number(session.gameNumber) || 1,
-      title: courseName ? `${courseName} — ${nineLabel}` : nineLabel,
-      holeIndex,
-      totalHoles,
-      progress: holeIndex / totalHoles,
-    });
+      playMode,
+      sessionId: null,
+      gameNumber: nextGameNumber || 1,
+      nextGameNumber,
+      numberOfGames,
+      hasActiveSession: false,
+      title:
+        nextGameNumber != null
+          ? `Start Game ${nextGameNumber} of ${numberOfGames}`
+          : item.location || item.title,
+      holeLabel: `Game ${completedCount} / ${numberOfGames} done`,
+      holeIndex: completedCount,
+      totalHoles: numberOfGames,
+      progress: numberOfGames > 0 ? completedCount / numberOfGames : 0,
+      badge: 'IN PROGRESS',
+      actionLabel:
+        nextGameNumber != null ? `START GAME ${nextGameNumber}` : 'CONTINUE',
+    };
   }, []);
 
   const loadHomeData = useCallback(async () => {
     try {
-      const [mineRes, invitedRes, historyRes, unreadRes, profileRes] = await Promise.all([
+      const [mineRes, invitedRes, playedRes, historyRes, unreadRes, profileRes] = await Promise.all([
         getTournamentsApi({ scope: 'mine', limit: 20 }).catch(() => null),
         getTournamentsApi({ scope: 'invited', limit: 20 }).catch(() => null),
+        getTournamentsApi({ scope: 'played', limit: 20 }).catch(() => null),
         getPlayerGameHistoryApi().catch(() => null),
         getUnreadNotificationsCountApi().catch(() => null),
         getPlayerProfileApi().catch(() => null),
@@ -2460,59 +2453,80 @@ const HomeScreen = ({ navigation }) => {
         const item = normalizeTournament(t, idx, 'invited');
         if (!byId.has(item.id)) byId.set(item.id, item);
       });
+      extractTournamentList(playedRes).forEach((t, idx) => {
+        const item = normalizeTournament(t, idx, 'played');
+        if (!byId.has(item.id)) byId.set(item.id, item);
+      });
+
+      const history =
+        historyRes?.history || historyRes?.data?.history || historyRes?.data || (Array.isArray(historyRes) ? historyRes : []);
+      const historyList = Array.isArray(history) ? history : [];
 
       const merged = Array.from(byId.values()).sort(
         (a, b) => a.startDateMs - b.startDateMs,
       );
-      const topFive = merged.slice(0, 5);
 
-      const readinessResults = await Promise.allSettled(
-        topFive.map((item) =>
-          item.id && typeof item.id === 'string' && item.id.includes('-')
-            ? getStartGameReadinessApi(item.id)
-            : Promise.resolve(null),
+      const readinessById = new Map();
+      const idsToCheck = new Set();
+      merged.forEach((item) => {
+        if (item.id && String(item.id).includes('-')) idsToCheck.add(String(item.id));
+      });
+      historyList.forEach((h) => {
+        const hid = h.tournamentId || h.tournament?.id || h.tournament?._id;
+        if (hid && String(hid).includes('-')) idsToCheck.add(String(hid));
+      });
+
+      await Promise.all(
+        Array.from(idsToCheck).map((id) =>
+          getStartGameReadinessApi(id)
+            .then((res) => readinessById.set(id, unwrapReadiness(res)))
+            .catch(() => readinessById.set(id, null)),
         ),
       );
 
-      const formattedHomeTournaments = topFive.map((item, idx) => {
-        const res =
-          readinessResults[idx]?.status === 'fulfilled'
-            ? readinessResults[idx]?.value?.data || readinessResults[idx]?.value
-            : null;
-        const hasActiveSession = Boolean(res?.activeSession?.id || res?.activeSession?.gameNumber);
-        const completedCount = Array.isArray(res?.completedGameNumbers) ? res.completedGameNumbers.length : 0;
-        const totalGames = Number(item.tournament?.numberOfGames) || 1;
-        const allGamesDone = completedCount >= totalGames && totalGames > 0;
-        const statusUpper = String(item.tournament?.status || '').toUpperCase();
-
-        const isCompleted = item.tournament?.isCompleted === true || allGamesDone || statusUpper === 'COMPLETED';
-        const isInProgress =
-          !isCompleted &&
-          (hasActiveSession ||
-            completedCount > 0 ||
-            statusUpper === 'IN_PROGRESS' ||
-            statusUpper === 'ACTIVE' ||
-            item.tournament?.isStarted === true ||
-            item.tournament?.hasStarted === true);
-
+      const formattedHomeTournaments = merged.map((item) => {
+        const play = classifyTournamentPlay(item.tournament, readinessById.get(String(item.id)));
         return {
           ...item,
           shareLinkEnabled: item.tournament?.shareLinkEnabled,
           joinUrl: item.tournament?.joinUrl,
           joinToken: item.tournament?.joinToken,
           joinDeepLink: item.tournament?.joinDeepLink,
-          isInProgress,
-          isCompleted,
-          activeSession: res?.activeSession,
+          isInProgress: play.isInProgress,
+          isCompleted: play.isCompleted,
+          hasActiveSession: play.hasActiveSession,
+          activeSession: play.activeSession,
+          nextGameNumber: play.nextGameNumber,
+          numberOfGames: play.numberOfGames,
+          completedCount: play.completedCount,
+          completedGameNumbers: play.completedGameNumbers,
         };
       });
 
-      setTournaments(formattedHomeTournaments);
-      loadLiveRound(merged).catch(() => setLiveRound(null));
+      const inProgressItems = formattedHomeTournaments
+        .filter((item) => item.isInProgress)
+        .sort((a, b) => inProgressActivityMs(b, historyList) - inProgressActivityMs(a, historyList));
 
-      const history =
-        historyRes?.history || historyRes?.data?.history || historyRes?.data || (Array.isArray(historyRes) ? historyRes : []);
-      const historyList = Array.isArray(history) ? history : [];
+      setTournaments(formattedHomeTournaments);
+
+      if (inProgressItems.length === 0) {
+        setLiveRound(null);
+      } else {
+        buildLiveRoundCard(inProgressItems[0])
+          .then(setLiveRound)
+          .catch(() => setLiveRound(null));
+      }
+
+      const completedOnly = historyList.filter((h) => {
+        const hid = String(h.tournamentId || h.tournament?.id || h.tournament?._id || '');
+        const matched = byId.get(hid);
+        const play = classifyTournamentPlay(
+          matched?.tournament || { id: hid, numberOfGames: h.numberOfGames },
+          readinessById.get(hid),
+        );
+        return play.isCompleted;
+      });
+      setCompletedHistory(groupGameHistoryByTournament(completedOnly));
       setGameHistory(historyList);
       const best = historyList.reduce((max, h) => {
         const s = Number(h.score);
@@ -2530,7 +2544,7 @@ const HomeScreen = ({ navigation }) => {
     } catch (err) {
       console.log('Home load error:', err);
     }
-  }, [loadLiveRound]);
+  }, [buildLiveRoundCard]);
 
   useFocusEffect(
     React.useCallback(() => {
@@ -2539,22 +2553,41 @@ const HomeScreen = ({ navigation }) => {
   );
 
   const openTournament = (item) => {
-    if (item.isInProgress && item.activeSession?.id) {
-      navigation.navigate('ActiveGame', {
-        tournament: item.tournament,
-        sessionId: item.activeSession.id,
-        gameNumber: Number(item.activeSession.gameNumber) || 1,
-        playMode: (item.playMode || item.tournament?.playMode || 'practice').toLowerCase() === 'challenge' ? 'challenge' : 'practice',
-      });
-      return;
-    }
-
     const playMode =
       item.playMode === 'CHALLENGE'
         ? 'challenge'
         : item.playMode === 'PRACTICE'
           ? 'practice'
           : item.tournament?.playMode || 'practice';
+
+    if (item.isInProgress && item.activeSession?.id) {
+      navigation.navigate('ActiveGame', {
+        tournament: item.tournament,
+        sessionId: item.activeSession.id,
+        gameNumber: Number(item.activeSession.gameNumber) || item.nextGameNumber || 1,
+        playMode,
+      });
+      return;
+    }
+
+    if (item.isInProgress) {
+      navigation.navigate('SelectGame', {
+        tournament: item.tournament,
+        playMode,
+        gameNumber: item.nextGameNumber || 1,
+        selectedGameIndex: Math.max(0, (item.nextGameNumber || 1) - 1),
+      });
+      return;
+    }
+
+    if (item.isCompleted || item.source === 'played') {
+      navigation.navigate('Leaderboard', {
+        tournament: item.tournament,
+        playMode,
+        gameNumber: Number(item.activeSession?.gameNumber) || item.nextGameNumber || 1,
+      });
+      return;
+    }
 
     if (item.source === 'invited') {
       navigation.navigate('ConfigureGames', {
@@ -2574,15 +2607,26 @@ const HomeScreen = ({ navigation }) => {
 
   const continueLiveRound = () => {
     if (!liveRound) return;
-    navigation.navigate('ActiveGame', {
+    const playMode = liveRound.playMode === 'CHALLENGE' ? 'challenge' : 'practice';
+    if (liveRound.sessionId) {
+      navigation.navigate('ActiveGame', {
+        tournament: liveRound.tournament,
+        sessionId: liveRound.sessionId,
+        gameNumber: liveRound.gameNumber,
+        playMode,
+      });
+      return;
+    }
+    navigation.navigate('SelectGame', {
       tournament: liveRound.tournament,
-      sessionId: liveRound.sessionId,
-      gameNumber: liveRound.gameNumber,
-      playMode: liveRound.playMode === 'CHALLENGE' ? 'challenge' : 'practice',
+      playMode,
+      gameNumber: liveRound.nextGameNumber || liveRound.gameNumber || 1,
+      selectedGameIndex: Math.max(0, (liveRound.nextGameNumber || liveRound.gameNumber || 1) - 1),
     });
   };
 
   const rawUser = userInfo?.user || userInfo?.data?.user || userInfo;
+  const currentUserId = rawUser?.id || rawUser?._id || rawUser?.userId;
   const getFullName = (u) => {
     if (!u) return 'User';
     if (u.firstName || u.lastName) {
@@ -2611,9 +2655,9 @@ const HomeScreen = ({ navigation }) => {
 
   // SCREEN 0: Home scroll contents
   const renderHomeView = () => {
-    const upcomingTournaments = tournaments.filter(
-      (item) => !item.isInProgress && !item.isCompleted,
-    );
+    const upcomingTournaments = tournaments
+      .filter((item) => !item.isInProgress && !item.isCompleted)
+      .slice(0, 5);
 
     return (
       <ScrollView
@@ -2687,10 +2731,10 @@ const HomeScreen = ({ navigation }) => {
                   <View style={activeStyles.liveTopRow}>
                     <View style={activeStyles.liveBadge}>
                       <View style={activeStyles.liveDot} />
-                      <Text style={activeStyles.liveText}>LIVE ROUND</Text>
+                      <Text style={activeStyles.liveText}>{liveRound.badge || 'LIVE ROUND'}</Text>
                     </View>
                     <Text style={activeStyles.holeText}>
-                      Hole {liveRound.holeIndex} / {liveRound.totalHoles}
+                      {liveRound.holeLabel || `Hole ${liveRound.holeIndex} / ${liveRound.totalHoles}`}
                     </Text>
                   </View>
 
@@ -2725,7 +2769,9 @@ const HomeScreen = ({ navigation }) => {
                     activeOpacity={0.85}
                   >
                     <Text style={activeStyles.continueRoundIcon}>▶</Text>
-                    <Text style={activeStyles.continueRoundText}>CONTINUE ROUND</Text>
+                    <Text style={activeStyles.continueRoundText}>
+                      {liveRound.actionLabel || `CONTINUE GAME ${liveRound.gameNumber || 1}`}
+                    </Text>
                   </TouchableOpacity>
                 </>
               ) : (
@@ -2795,6 +2841,32 @@ const HomeScreen = ({ navigation }) => {
                       <AuthIcon name="share" size={moderateScale(13)} color="#093A24" />
                     </TouchableOpacity>
                   ) : null}
+                  {item.source === 'mine' ||
+                  (currentUserId &&
+                    String(
+                      item.tournament?.creatorUserId ||
+                        item.tournament?.creatorId ||
+                        item.tournament?.createdBy,
+                    ) === String(currentUserId)) ? (
+                    <TouchableOpacity
+                      style={activeStyles.cardEditBtn}
+                      onPress={(e) => {
+                        e.stopPropagation();
+                        navigation.navigate('CreateTournament', {
+                          tournament: item.tournament || item,
+                          isEditing: true,
+                          playMode:
+                            item.playMode === 'CHALLENGE' ||
+                            String(item.tournament?.playMode || '').toUpperCase().includes('CHALLENGE')
+                              ? 'challenge'
+                              : 'practice',
+                        });
+                      }}
+                      activeOpacity={0.7}
+                    >
+                      <Image source={editIcon} style={activeStyles.editIconImg} resizeMode="contain" />
+                    </TouchableOpacity>
+                  ) : null}
                   {item.playMode ? (
                     <View
                       style={[
@@ -2851,27 +2923,57 @@ const HomeScreen = ({ navigation }) => {
         <View style={activeStyles.section}>
           <View style={activeStyles.sectionHeader}>
             <Text style={activeStyles.sectionTitle}>Completed Tournaments</Text>
-            {gameHistory.length > 0 ? (
+            {completedHistory.length > 0 ? (
               <TouchableOpacity onPress={() => navigation.navigate('TournamentHistory')}>
                 <Text style={activeStyles.seeAll}>History</Text>
               </TouchableOpacity>
             ) : null}
           </View>
 
-          {gameHistory.length === 0 ? (
+          {completedHistory.length === 0 ? (
             <Text style={activeStyles.emptyText}>No tournament history yet.</Text>
           ) : (
-            gameHistory.slice(0, 5).map((item, idx) => {
-              const title = item.tournamentName || item.golfCourseName || 'Completed Round';
-              const courseText = item.golfCourseName ? ` · ${item.golfCourseName}` : '';
-              const subtitle = `Score ${item.score ?? '—'}${courseText}`;
-              const dateStr = item.completedAt ? formatDisplayDate(item.completedAt) : '';
+            completedHistory.slice(0, 5).map((item, idx) => {
+              const matched = tournaments.find(
+                (t) => String(t.id) === String(item.tournamentId),
+              );
+              const rawMode =
+                item.playMode ||
+                matched?.playMode ||
+                matched?.tournament?.playMode ||
+                '';
+              const modeLabel = String(rawMode).toLowerCase().includes('challenge')
+                ? 'Challenge'
+                : 'Practice';
+              const gameCount = item.games?.length || 0;
+              const courseText = item.courseName ? ` · ${item.courseName}` : '';
+              const gamesLabel = gameCount === 1 ? '1 game' : `${gameCount} games`;
+              const subtitle = `Score ${item.totalScore ?? '—'} · ${gamesLabel} · ${modeLabel}${courseText}`;
+              const dateStr = item.lastCompletedAt ? formatDisplayDate(item.lastCompletedAt) : '';
 
               return (
                 <TouchableOpacity
-                  key={item.sessionId || item.tournamentId || String(idx)}
+                  key={item.tournamentId || String(idx)}
                   style={activeStyles.activityCard}
-                  onPress={() => navigation.navigate('TournamentHistory')}
+                  onPress={() => {
+                    if (!item.tournamentId) {
+                      navigation.navigate('TournamentHistory');
+                      return;
+                    }
+                    navigation.navigate('Leaderboard', {
+                      tournament: {
+                        id: item.tournamentId,
+                        name: item.title,
+                        title: item.title,
+                        playMode: item.playMode,
+                        numberOfGames: item.games?.length || 1,
+                      },
+                      playMode: String(item.playMode || '').toLowerCase().includes('challenge')
+                        ? 'challenge'
+                        : 'practice',
+                      gameNumber: item.latestGameNumber || item.games?.[0]?.gameNumber || 1,
+                    });
+                  }}
                   activeOpacity={0.8}
                 >
                   <View style={activeStyles.activityImageContainer}>
@@ -2883,7 +2985,7 @@ const HomeScreen = ({ navigation }) => {
                   </View>
                   <View style={activeStyles.activityInfo}>
                     <Text style={activeStyles.activityTitle} numberOfLines={1}>
-                      {title}
+                      {item.title}
                     </Text>
                     <Text style={activeStyles.activitySubtitle} numberOfLines={1}>
                       {subtitle}
@@ -3352,6 +3454,19 @@ const activeStyles = StyleSheet.create({
     backgroundColor: '#BCFF00',
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  cardEditBtn: {
+    width: moderateScale(26),
+    height: moderateScale(26),
+    borderRadius: moderateScale(13),
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  editIconImg: {
+    width: moderateScale(15),
+    height: moderateScale(15),
+    tintColor: '#093A24',
   },
   modeBadge: {
     borderRadius: moderateScale(20),

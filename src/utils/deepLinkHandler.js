@@ -1,6 +1,6 @@
 import { Linking } from 'react-native';
 import { navigate } from '../navigation/RootNavigator';
-import { getTournamentByIdApi } from '../services/homeService';
+import { getTournamentByIdApi, getTournamentsApi } from '../services/homeService';
 
 /**
  * Extracts tournament ID from a URL string or notification data object.
@@ -66,8 +66,14 @@ export const processDeepLink = async (urlOrData, navigationOverride = null) => {
 
     // If direct ID fetch failed, search candidate tournaments for matching joinToken or ID
     if (!tournament || (!tournament.id && !tournament._id)) {
-      const listRes = await getTournamentsApi({ page: 1, limit: 50 }).catch(() => null);
-      const list = listRes?.tournaments || listRes?.data?.tournaments || (Array.isArray(listRes) ? listRes : []);
+      const listResults = await Promise.all([
+        getTournamentsApi({ page: 1, limit: 50, scope: 'joinable' }).catch(() => null),
+        getTournamentsApi({ page: 1, limit: 50, scope: 'invited' }).catch(() => null),
+        getTournamentsApi({ page: 1, limit: 50, scope: 'mine' }).catch(() => null),
+      ]);
+      const list = listResults.flatMap((listRes) =>
+        listRes?.tournaments || listRes?.data?.tournaments || (Array.isArray(listRes) ? listRes : []),
+      );
       const matched = list.find(
         (t) =>
           String(t.joinToken) === String(targetIdOrToken) ||

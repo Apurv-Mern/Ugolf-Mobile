@@ -17,8 +17,15 @@ export const getPlayerGameHistoryApi = async (params) => {
   return await getApi(ENDPOINTS.PLAYER_GAME_HISTORY, params);
 };
 
-export const getTournamentLeaderboardApi = async (tournamentId) => {
-  return await getApi(ENDPOINTS.TOURNAMENT_LEADERBOARD(tournamentId));
+export const getTournamentLeaderboardApi = async (tournamentId, params = {}) => {
+  const query = {};
+  if (params.gameNumber != null) {
+    query.gameNumber = params.gameNumber;
+  }
+  if (params.view != null) {
+    query.view = params.view;
+  }
+  return await getApi(ENDPOINTS.TOURNAMENT_LEADERBOARD(tournamentId), query);
 };
 
 export const getAuthMeApi = async () => {
