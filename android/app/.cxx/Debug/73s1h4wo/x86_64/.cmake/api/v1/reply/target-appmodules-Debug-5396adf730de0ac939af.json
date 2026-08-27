@@ -372,11 +372,11 @@
 		},
 		{
 			"backtrace" : 4,
-			"id" : "react_codegen_RNPermissionsSpec::@7ad697819b753921c957"
+			"id" : "react_codegen_rngesturehandler_codegen::@39f233abcd2c728bc6ec"
 		},
 		{
 			"backtrace" : 4,
-			"id" : "react_codegen_rngesturehandler_codegen::@39f233abcd2c728bc6ec"
+			"id" : "react_codegen_rnmapbox_maps_specs::@636de9d518b8c337676e"
 		},
 		{
 			"backtrace" : 4,
@@ -384,7 +384,15 @@
 		},
 		{
 			"backtrace" : 4,
-			"id" : "react_codegen_rnmapbox_maps_specs::@636de9d518b8c337676e"
+			"id" : "react_codegen_RNPermissionsSpec::@7ad697819b753921c957"
+		},
+		{
+			"backtrace" : 4,
+			"id" : "react_codegen_rnreanimated::@8afabad14bfffa3f8b9a"
+		},
+		{
+			"backtrace" : 4,
+			"id" : "react_codegen_RNVectorIconsSpec::@479809fae146501fd34d"
 		},
 		{
 			"backtrace" : 4,
@@ -396,19 +404,11 @@
 		},
 		{
 			"backtrace" : 4,
-			"id" : "react_codegen_rnworklets::@68f58d84d4754f193387"
-		},
-		{
-			"backtrace" : 4,
-			"id" : "react_codegen_rnreanimated::@8afabad14bfffa3f8b9a"
-		},
-		{
-			"backtrace" : 4,
 			"id" : "react_codegen_rnsvg::@4f40eb209d0c0b4a3b65"
 		},
 		{
 			"backtrace" : 4,
-			"id" : "react_codegen_RNVectorIconsSpec::@479809fae146501fd34d"
+			"id" : "react_codegen_rnworklets::@68f58d84d4754f193387"
 		}
 	],
 	"id" : "appmodules::@6890427a1f51a3e7e1df",
