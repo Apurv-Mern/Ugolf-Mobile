@@ -47,6 +47,9 @@ const InviteOtherTeamsScreen = ({ navigation, route }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(false);
   const [actionLoadingId, setActionLoadingId] = useState(null);
+  const [challengeLocked, setChallengeLocked] = useState(
+    !!tournamentParam?.challengeLocked,
+  );
 
   // Load candidate opponent teams from API
   const fetchInviteCandidates = async () => {
@@ -88,30 +91,33 @@ const InviteOtherTeamsScreen = ({ navigation, route }) => {
             // Backend invite-candidate status "invited" means accepted.
             statusLower === 'invited' ||
             statusLower === 'joined' ||
-            statusLower === 'confirmed' ||
-            !!item.isAccepted ||
-            !!t.isAccepted;
-          const isInvited =
-            !!linked ||
-            isAccepted ||
-            statusLower === 'invited' ||
-            statusLower === 'pending' ||
-            !!item.isInvited ||
-            !!t.isInvited;
+            statusLower === 'confirmed';
+          const isPending = statusLower === 'pending';
+          const isUnavailable = statusLower === 'unavailable';
+          // Rejected or available → host can invite again. Do not treat a
+          // leftover rejected link as still invited.
+          const isInvited = isPending || isAccepted;
 
           return {
             id: candidateTeamId,
             name: t.name || t.teamName || t.displayName || t.title || 'Opponent Team',
             memberCount: t.memberCount || (t.members ? t.members.length : 1),
-            // city: t.city || t.location || '',
             status: statusLower,
-            isInvited: isInvited,
-            isAccepted: isAccepted,
+            isInvited,
+            isPending,
+            isAccepted,
+            isUnavailable,
             isOwnTeam: statusLower === 'your_team' || !!t.isOwnTeam || candidateTeamId === String(selectedTeam?.id),
           };
         });
         setTeamsList(formatted);
       }
+
+      const locked =
+        tRes?.challengeLocked === true ||
+        tRes?.data?.challengeLocked === true ||
+        !!tournamentParam?.challengeLocked;
+      setChallengeLocked(locked);
     } catch (err) {
       console.log('Fetch invite candidates error:', err);
     } finally {
@@ -139,10 +145,13 @@ const InviteOtherTeamsScreen = ({ navigation, route }) => {
 
   const handleToggleInvite = async (teamItem) => {
     if (!tournamentId || !isUuid(String(tournamentId))) return;
+    // Accepted opponents cannot be removed for now (no product flow).
+    // if (teamItem.isAccepted) { ... uninvite / Remove ... }
+    if (teamItem.isAccepted) return;
 
     setActionLoadingId(teamItem.id);
     try {
-      if (teamItem.isInvited) {
+      if (teamItem.isPending) {
         await uninviteTeamFromTournamentApi(tournamentId, teamItem.id);
         Toast.show({
           type: 'info',
@@ -150,7 +159,6 @@ const InviteOtherTeamsScreen = ({ navigation, route }) => {
           text2: `${teamItem.name} has been removed from tournament.`,
         });
       } else {
-        // Invite team — backend auto-dispatches notifications
         await inviteTeamToTournamentApi(tournamentId, { teamId: teamItem.id });
 
         Toast.show({
@@ -159,11 +167,14 @@ const InviteOtherTeamsScreen = ({ navigation, route }) => {
           text2: `Successfully invited ${teamItem.name} to tournament!`,
         });
       }
-      // Server state is authoritative: pending does not mean accepted.
       await fetchInviteCandidates();
     } catch (err) {
       console.log('Toggle team invite error:', err);
-      const backendMsg = err?.response?.data?.error || err?.response?.data?.message || 'Could not update team invitation.';
+      const backendMsg =
+        err?.response?.data?.error ||
+        err?.response?.data?.message ||
+        err?.message ||
+        'Could not update team invitation.';
       Toast.show({
         type: 'error',
         text1: 'Action Failed',
@@ -182,9 +193,13 @@ const InviteOtherTeamsScreen = ({ navigation, route }) => {
   const filteredTeams = teamsList.filter(
     (t) =>
       !t.isOwnTeam &&
+      !t.isUnavailable &&
       String(t.id) !== String(selectedTeam?.id) &&
       ((t.name || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
         (t.city || '').toLowerCase().includes(searchQuery.toLowerCase()))
+  );
+  const hasActiveOpponentInvite = teamsList.some(
+    (t) => !t.isOwnTeam && (t.isPending || t.isAccepted),
   );
 
   const handleContinue = () => {
@@ -289,8 +304,20 @@ const InviteOtherTeamsScreen = ({ navigation, route }) => {
               </View>
             )}
 
+            {hasActiveOpponentInvite && !challengeLocked ? (
+              <Text style={styles.oneInviteHint}>
+                Only one opponent invite at a time. Uninvite first to invite another team.
+              </Text>
+            ) : null}
+
             {/* Teams list */}
-            {filteredTeams.map((item, idx) => (
+            {filteredTeams.map((item, idx) => {
+              const inviteDisabled =
+                !item.isInvited && (hasActiveOpponentInvite || challengeLocked);
+              const actionLabel = item.isPending
+                ? 'Uninvite'
+                : 'Invite to tournament';
+              return (
               <View
                 key={item.id || `team-card-${idx}`}
                 style={[
@@ -299,38 +326,65 @@ const InviteOtherTeamsScreen = ({ navigation, route }) => {
                 ]}
               >
                 <View style={styles.teamInfoCol}>
-                  <Text style={styles.teamNameText}>{item.name}</Text>
+                  <View style={styles.teamNameRow}>
+                    <Text style={styles.teamNameText}>{item.name}</Text>
+                    {item.isPending ? (
+                      <View style={[styles.statusTag, styles.statusTagPending]}>
+                        <Text style={styles.statusTagPendingText}>Pending</Text>
+                      </View>
+                    ) : null}
+                  </View>
                   <Text style={styles.teamDetailsText}>
                     {item.memberCount} member{item.memberCount !== 1 ? 's' : ''}
                     {!!item.city ? ` · ${item.city}` : ''}
                   </Text>
                 </View>
 
-                {/* Action Button: Invite to tournament OR Uninvite */}
+                {/* Remove after accept is disabled for now — keep Accepted tag only.
+                {item.isAccepted ? (
+                  <TouchableOpacity
+                    style={[styles.actionBtn, styles.uninviteBtn]}
+                    onPress={() => handleToggleInvite(item)}
+                    disabled={actionLoadingId === item.id}
+                    activeOpacity={0.8}
+                  >
+                    <Text style={[styles.actionBtnText, styles.uninviteBtnText]}>Remove</Text>
+                  </TouchableOpacity>
+                ) : null}
+                */}
+                {item.isAccepted ? (
+                  <View style={[styles.actionBtn, styles.inviteBtn]}>
+                    <Text style={[styles.actionBtnText, styles.inviteBtnText]}>Accepted</Text>
+                  </View>
+                ) : (
                 <TouchableOpacity
                   style={[
                     styles.actionBtn,
-                    item.isInvited ? styles.uninviteBtn : styles.inviteBtn,
+                    item.isPending ? styles.uninviteBtn : styles.inviteBtn,
+                    inviteDisabled && styles.disabledBtn,
                   ]}
                   onPress={() => handleToggleInvite(item)}
-                  disabled={actionLoadingId === item.id}
+                  disabled={actionLoadingId === item.id || inviteDisabled}
                   activeOpacity={0.8}
                 >
                   {actionLoadingId === item.id ? (
-                    <ActivityIndicator size="small" color={item.isInvited ? '#E53E3E' : '#093A24'} />
+                    <ActivityIndicator size="small" color={item.isPending ? '#E53E3E' : '#093A24'} />
                   ) : (
                     <Text
                       style={[
                         styles.actionBtnText,
-                        item.isInvited ? styles.uninviteBtnText : styles.inviteBtnText,
+                        item.isPending ? styles.uninviteBtnText : styles.inviteBtnText,
+                        inviteDisabled && styles.disabledBtnText,
                       ]}
                     >
-                      {item.isInvited ? (item.isAccepted ? 'Accepted' : 'Uninvite') : 'Invite to tournament'}
+                      {actionLabel}
                     </Text>
                   )}
                 </TouchableOpacity>
+                )}
               </View>
-            ))}
+              );
+            })}
           </>
         ) : null}
 
@@ -496,10 +550,43 @@ const styles = StyleSheet.create({
     flex: 1,
     marginRight: wp(3),
   },
+  oneInviteHint: {
+    fontFamily: FONTS.medium,
+    fontSize: fontSize(12),
+    color: '#718096',
+    marginBottom: hp(1.5),
+  },
+  teamNameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: wp(2),
+  },
   teamNameText: {
     fontFamily: FONTS.bold,
     fontSize: fontSize(15.5),
     color: '#093A24',
+  },
+  statusTag: {
+    borderRadius: moderateScale(10),
+    paddingHorizontal: wp(2.2),
+    paddingVertical: hp(0.25),
+  },
+  statusTagPending: {
+    backgroundColor: '#FEF3C7',
+  },
+  statusTagPendingText: {
+    fontFamily: FONTS.bold,
+    fontSize: fontSize(10),
+    color: '#B45309',
+  },
+  statusTagAccepted: {
+    backgroundColor: '#DCFCE7',
+  },
+  statusTagAcceptedText: {
+    fontFamily: FONTS.bold,
+    fontSize: fontSize(10),
+    color: '#166534',
   },
   teamDetailsText: {
     fontFamily: FONTS.medium,

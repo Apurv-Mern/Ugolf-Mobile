@@ -557,8 +557,9 @@ import Toast from 'react-native-toast-message';
 import { getTournamentsApi, getTournamentByIdApi } from '../../services/homeService';
 import { getTournamentTeamsApi, getTeamsApi, getTeamByIdApi } from '../../services/teamService';
 import { getStartGameReadinessApi } from '../../services/playService';
+import { getTournamentLeaderboardApi } from '../../services/playerService';
 import { shareTournamentLink } from '../../utils/shareUtils';
-import { classifyTournamentPlay, unwrapReadiness } from '../../utils/playProgress';
+import { classifyTournamentPlay, leaderboardIndicatesStarted, unwrapReadiness } from '../../utils/playProgress';
 
 import AuthButton from '../../components/common/AuthButton';
 import AuthIcon from '../../components/common/AuthIcon';
@@ -665,6 +666,7 @@ const SelectTournamentScreen = ({ navigation, route }) => {
   const [loading, setLoading] = useState(false);
 
   const playMode = route?.params?.playMode || 'challenge';
+  const showAllModes = route?.params?.showAllModes === true;
 
   const loadTournaments = async () => {
     setLoading(true);
@@ -767,30 +769,47 @@ const SelectTournamentScreen = ({ navigation, route }) => {
         ),
       );
 
-      const finalFormatted = formatted.map((item, idx) => {
-        const res =
-          readinessResults[idx]?.status === 'fulfilled'
-            ? unwrapReadiness(readinessResults[idx]?.value)
-            : null;
-        const play = classifyTournamentPlay(item, res);
+      const finalFormatted = await Promise.all(
+        formatted.map(async (item, idx) => {
+          const res =
+            readinessResults[idx]?.status === 'fulfilled'
+              ? unwrapReadiness(readinessResults[idx]?.value)
+              : null;
+          let play = classifyTournamentPlay(item, res);
+          if (!play.isInProgress && !play.isCompleted && item.id && String(item.id).includes('-')) {
+            try {
+              const board = await getTournamentLeaderboardApi(item.id, {
+                gameNumber: 1,
+                view: 'game',
+              });
+              if (leaderboardIndicatesStarted(board)) {
+                play = classifyTournamentPlay(item, res, { anyonePlayed: true });
+              }
+            } catch (_) {
+              /* keep original classification */
+            }
+          }
 
-        return {
-          ...item,
-          isInProgress: play.isInProgress,
-          isCompleted: play.isCompleted,
-          hasActiveSession: play.hasActiveSession,
-          activeSession: play.activeSession,
-          nextGameNumber: play.nextGameNumber,
-          numberOfGames: play.numberOfGames,
-        };
-      });
+          return {
+            ...item,
+            isInProgress: play.isInProgress,
+            isCompleted: play.isCompleted,
+            hasActiveSession: play.hasActiveSession,
+            activeSession: play.activeSession,
+            nextGameNumber: play.nextGameNumber,
+            numberOfGames: play.numberOfGames,
+            gameStarted: play.gameStarted,
+          };
+        }),
+      );
 
       // Filter out completed tournaments (they are shown on Home screen completed section)
       const uncompletedOnly = finalFormatted.filter((t) => t.isCompleted !== true);
 
       const currentPlayMode = (route?.params?.playMode || playMode || '').toLowerCase();
       let modeFiltered = uncompletedOnly;
-      if (currentPlayMode) {
+      // Home "See all" should list every mine + invited event, both modes.
+      if (!showAllModes && currentPlayMode) {
         modeFiltered = uncompletedOnly.filter((t) => {
           const tMode = (t.playMode || '').toLowerCase();
           if (currentPlayMode === 'practice' || currentPlayMode.includes('practice')) {
@@ -847,7 +866,7 @@ const SelectTournamentScreen = ({ navigation, route }) => {
       };
       const subscription = BackHandler.addEventListener('hardwareBackPress', onBackPress);
       return () => subscription.remove();
-    }, [navigation])
+    }, [navigation, route?.params?.showAllModes, route?.params?.playMode])
   );
 
   const myTournaments = tournaments.filter(
@@ -878,6 +897,31 @@ const SelectTournamentScreen = ({ navigation, route }) => {
         >
           <View style={styles.tournamentCardOverlay} />
 
+          {(() => {
+            const modeStr = String(item.playMode || '').toLowerCase();
+            const isChallenge = modeStr.includes('challenge');
+            if (!modeStr) return null;
+            return (
+              <View
+                style={[
+                  styles.modeBadge,
+                  isChallenge ? styles.modeBadgeChallenge : styles.modeBadgePractice,
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.modeBadgeText,
+                    isChallenge
+                      ? styles.modeBadgeTextChallenge
+                      : styles.modeBadgeTextPractice,
+                  ]}
+                >
+                  {isChallenge ? 'Challenge' : 'Practice'}
+                </Text>
+              </View>
+            );
+          })()}
+
           <View
             style={[
               styles.cardSelectCircle,
@@ -906,8 +950,21 @@ const SelectTournamentScreen = ({ navigation, route }) => {
               );
             }
 
-            const canEdit = item.isMine && !isCompleted && !isInProgress && !item.isStarted;
-            const canShare = !isCompleted && !isInProgress && !item.isStarted && (item.shareLinkEnabled === true || (item.shareLinkEnabled !== false && (!!item.joinUrl || !!item.joinToken)));
+            const canEdit =
+              item.isMine &&
+              !isCompleted &&
+              !isInProgress &&
+              !item.isStarted &&
+              !item.gameStarted &&
+              !item.challengeLocked;
+            const canShare =
+              item.isMine &&
+              !isCompleted &&
+              !isInProgress &&
+              !item.isStarted &&
+              (item.shareLinkEnabled === true ||
+                (item.shareLinkEnabled !== false &&
+                  (!!item.joinUrl || !!item.joinToken)));
 
             if (!canEdit && !canShare) return null;
 
@@ -979,7 +1036,11 @@ const SelectTournamentScreen = ({ navigation, route }) => {
         showsVerticalScrollIndicator={false}
       >
         {/* ── 1. Header with BG Image ── */}
-        <ImageBackground source={tournamentBg} style={styles.header} resizeMode="cover">
+        <ImageBackground
+          source={tournamentBg}
+          style={[styles.header, showAllModes && styles.headerWithoutCreate]}
+          resizeMode="cover"
+        >
           <View style={styles.headerOverlay} />
 
           {/* Back Button */}
@@ -994,24 +1055,27 @@ const SelectTournamentScreen = ({ navigation, route }) => {
           <Text style={styles.bannerTitle}>Select Tournament</Text>
         </ImageBackground>
 
-        {/* ── 2. Overlapping Create Tournament Card (overlaps header via negative marginTop) ── */}
-        <TouchableOpacity
-          style={styles.createHeroCard}
-          onPress={() => navigation.navigate('CreateTournament', { ...route?.params })}
-          activeOpacity={0.88}
-        >
-          <View style={styles.createHeroIconCircle}>
-            <AuthIcon name="plus" size={moderateScale(24)} color="#093A24" />
-          </View>
+        {!showAllModes ? (
+          <TouchableOpacity
+            style={styles.createHeroCard}
+            onPress={() =>
+              navigation.navigate('CreateTournament', { ...route?.params })
+            }
+            activeOpacity={0.88}
+          >
+            <View style={styles.createHeroIconCircle}>
+              <AuthIcon name="plus" size={moderateScale(24)} color="#093A24" />
+            </View>
 
-          <View style={styles.createHeroTextWrap}>
-            <Text style={styles.createHeroLabel}>NEW TOURNAMENT</Text>
-            <Text style={styles.createHeroTitle}>CREATE TOURNAMENT</Text>
-          </View>
-        </TouchableOpacity>
+            <View style={styles.createHeroTextWrap}>
+              <Text style={styles.createHeroLabel}>NEW TOURNAMENT</Text>
+              <Text style={styles.createHeroTitle}>CREATE TOURNAMENT</Text>
+            </View>
+          </TouchableOpacity>
+        ) : null}
 
         {/* ── 3. Tournaments Sections ── */}
-        <View style={styles.section}>
+        <View style={[styles.section, showAllModes && styles.sectionWithoutCreate]}>
           {loading ? (
             <ActivityIndicator size="large" color="#093A24" style={{ marginTop: hp(4) }} />
           ) : tournaments.length === 0 ? (
@@ -1019,9 +1083,11 @@ const SelectTournamentScreen = ({ navigation, route }) => {
               <Text style={{ fontFamily: FONTS.bold, fontSize: fontSize(16), color: '#093A24', textAlign: 'center' }}>
                 No tournaments created or invited yet
               </Text>
-              <Text style={{ fontFamily: FONTS.medium, fontSize: fontSize(13), color: '#718096', marginTop: hp(0.8), textAlign: 'center' }}>
-                Tap "CREATE TOURNAMENT" above to set up your first event!
-              </Text>
+              {!showAllModes ? (
+                <Text style={{ fontFamily: FONTS.medium, fontSize: fontSize(13), color: '#718096', marginTop: hp(0.8), textAlign: 'center' }}>
+                  Tap "CREATE TOURNAMENT" above to set up your first event!
+                </Text>
+              ) : null}
             </View>
           ) : (
             <>
@@ -1076,10 +1142,22 @@ const SelectTournamentScreen = ({ navigation, route }) => {
                   gameNumber: selectedT.nextGameNumber || 1,
                   selectedGameIndex: Math.max(0, (selectedT.nextGameNumber || 1) - 1),
                 });
+              } else if (
+                selectedT.source === 'invited' ||
+                selectedT.isMine === false
+              ) {
+                navigation.navigate('SelectGame', {
+                  ...route?.params,
+                  tournament: selectedT,
+                  playMode,
+                  gameNumber: selectedT.nextGameNumber || 1,
+                  selectedGameIndex: Math.max(0, (selectedT.nextGameNumber || 1) - 1),
+                });
               } else {
                 navigation.navigate('ConfigureGames', {
                   ...route?.params,
                   tournament: selectedT,
+                  playMode,
                 });
               }
             } else {
@@ -1117,6 +1195,9 @@ const styles = StyleSheet.create({
     paddingBottom: hp(7.5), // Extra bottom padding so card overlaps header cleanly
     paddingHorizontal: wp(5),
     position: 'relative',
+  },
+  headerWithoutCreate: {
+    paddingBottom: hp(3.5),
   },
   headerOverlay: {
     ...StyleSheet.absoluteFillObject,
@@ -1199,6 +1280,9 @@ const styles = StyleSheet.create({
   section: {
     paddingHorizontal: wp(5),
     marginTop: hp(2.5),
+  },
+  sectionWithoutCreate: {
+    marginTop: hp(2),
   },
   sectionTitle: {
     fontFamily: FONTS.bold,
@@ -1341,6 +1425,36 @@ const styles = StyleSheet.create({
     fontSize: fontSize(9.5),
     color: '#BCFF00',
     letterSpacing: 0.3,
+  },
+  modeBadge: {
+    position: 'absolute',
+    top: wp(3.5),
+    left: wp(4),
+    borderRadius: moderateScale(20),
+    paddingHorizontal: wp(3),
+    paddingVertical: hp(0.45),
+    borderWidth: 1.5,
+    zIndex: 10,
+  },
+  modeBadgePractice: {
+    backgroundColor: 'rgba(9, 58, 36, 0.85)',
+    borderColor: 'rgba(255, 255, 255, 0.9)',
+  },
+  modeBadgeChallenge: {
+    backgroundColor: 'rgba(9, 58, 36, 0.85)',
+    borderColor: '#BCFF00',
+  },
+  modeBadgeText: {
+    fontFamily: FONTS.bold,
+    fontSize: fontSize(10.5),
+    letterSpacing: 0.6,
+    textTransform: 'uppercase',
+  },
+  modeBadgeTextPractice: {
+    color: '#FFFFFF',
+  },
+  modeBadgeTextChallenge: {
+    color: '#BCFF00',
   },
 
   // ── 4. Fixed Bottom Button ──

@@ -612,13 +612,6 @@ const SelectPlayerPositionScreen = ({ navigation, route }) => {
     }, [teamId, navigation])
   );
 
-  const captainUserId = selectedTeam?.creatorUserId || selectedTeam?.creatorId || selectedTeam?.createdBy || (players.length > 0 ? players[0]?.id : null);
-  const isTeamCaptain = Boolean(
-    currentUserId &&
-    captainUserId &&
-    String(captainUserId).toLowerCase() === String(currentUserId).toLowerCase()
-  );
-
   const tournamentCreatorId = tournament?.creatorUserId || tournament?.creatorId || tournament?.createdBy;
   const isTournamentCreator = Boolean(
     currentUserId &&
@@ -696,7 +689,7 @@ const SelectPlayerPositionScreen = ({ navigation, route }) => {
             <AuthIcon name="chevron-left" size={moderateScale(22)} color="#093A24" />
           </TouchableOpacity>
 
-          <Text style={styles.bannerTitle}>Select your player's position</Text>
+          <Text style={styles.bannerTitle}>Team Members</Text>
         </ImageBackground>
 
         {/* ── 2. White Content Container ── */}
@@ -704,21 +697,6 @@ const SelectPlayerPositionScreen = ({ navigation, route }) => {
           {/* Members Header Row */}
           <View style={styles.membersHeaderRow}>
             <Text style={styles.membersTitle}>Members</Text>
-            {isTeamCaptain && (
-              <TouchableOpacity
-                onPress={() =>
-                  navigation.navigate('EditPlayers', {
-                    tournament,
-                    team: selectedTeam,
-                    selectedTeam,
-                    players,
-                  })
-                }
-                activeOpacity={0.7}
-              >
-                <Text style={styles.editBtnText}>Edit</Text>
-              </TouchableOpacity>
-            )}
           </View>
 
           {/* Player Cards List */}
@@ -743,9 +721,9 @@ const SelectPlayerPositionScreen = ({ navigation, route }) => {
         </View>
       </ScrollView>
 
-      {/* Footer Start Game Button */}
+      {/* Footer Continue Button */}
       <View style={styles.btnFixedBottom}>
-        <AuthButton title="START GAME" onPress={handleStartGame} />
+        <AuthButton title="CONTINUE" onPress={handleStartGame} />
       </View>
     </SafeAreaView>
   );
@@ -812,11 +790,6 @@ const styles = StyleSheet.create({
   membersTitle: {
     fontFamily: FONTS.bold,
     fontSize: fontSize(17),
-    color: '#093A24',
-  },
-  editBtnText: {
-    fontFamily: FONTS.bold,
-    fontSize: fontSize(14),
     color: '#093A24',
   },
 

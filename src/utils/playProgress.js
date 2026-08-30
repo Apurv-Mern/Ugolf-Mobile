@@ -3,11 +3,46 @@
  * A tournament is completed only when this user has finished every game.
  */
 
+export function isChallengePlayMode(...values) {
+  return values.some((value) =>
+    String(value || '')
+      .toUpperCase()
+      .includes('CHALLENGE'),
+  );
+}
+
 export function unwrapReadiness(res) {
+  let cur = res;
+  for (let i = 0; i < 4 && cur && typeof cur === 'object'; i += 1) {
+    if (
+      cur.completedGameNumbers != null ||
+      typeof cur.gameStarted === 'boolean' ||
+      typeof cur.ready === 'boolean' ||
+      cur.activeSession !== undefined ||
+      cur.nextGameNumber !== undefined
+    ) {
+      return cur;
+    }
+    cur = cur.data || cur.readiness || null;
+  }
   return res?.data || res || null;
 }
 
-export function classifyTournamentPlay(tournament, readiness) {
+/** True when any team/player already has a score on this tournament. */
+export function leaderboardIndicatesStarted(res) {
+  const data = res?.data || res;
+  const entries = data?.entries;
+  if (Array.isArray(entries) && entries.length > 0) return true;
+  const teams = data?.challenge?.teams;
+  if (!Array.isArray(teams)) return false;
+  return teams.some(
+    (team) =>
+      Number(team.totalScore) > 0 ||
+      (Array.isArray(team.players) && team.players.length > 0),
+  );
+}
+
+export function classifyTournamentPlay(tournament, readiness, extras = {}) {
   const numberOfGames = Math.max(
     1,
     Number(readiness?.numberOfGames ?? tournament?.numberOfGames) || 1,
@@ -18,6 +53,13 @@ export function classifyTournamentPlay(tournament, readiness) {
     readiness?.nextGameNumber != null ? Number(readiness.nextGameNumber) : null;
   const activeSession = readiness?.activeSession || null;
   const hasActiveSession = Boolean(activeSession?.id || activeSession?.gameNumber);
+  const gameStarted = Boolean(
+    extras.anyonePlayed ||
+      readiness?.gameStarted ||
+      readiness?.hasStarted ||
+      tournament?.gameStarted ||
+      tournament?.hasStarted,
+  );
 
   const allGamesDone =
     Boolean(readiness) &&
@@ -26,7 +68,8 @@ export function classifyTournamentPlay(tournament, readiness) {
     nextGameNumber == null;
 
   const isInProgress =
-    Boolean(readiness) && !allGamesDone && (hasActiveSession || completedCount > 0);
+    !allGamesDone &&
+    (hasActiveSession || completedCount > 0 || gameStarted);
 
   return {
     numberOfGames,
@@ -35,6 +78,7 @@ export function classifyTournamentPlay(tournament, readiness) {
     nextGameNumber,
     activeSession,
     hasActiveSession,
+    gameStarted,
     allGamesDone,
     isInProgress,
     isCompleted: allGamesDone,
@@ -117,8 +161,11 @@ export function groupGameHistoryByTournament(history) {
       group.latestGameNumber = gameNumber;
     }
 
-    if (!group.playMode && (row.playMode || row.tournament?.playMode)) {
-      group.playMode = row.playMode || row.tournament?.playMode;
+    const rowMode = row.playMode || row.tournament?.playMode || '';
+    if (isChallengePlayMode(rowMode)) {
+      group.playMode = 'CHALLENGE';
+    } else if (!group.playMode) {
+      group.playMode = rowMode;
     }
   }
 

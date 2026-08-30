@@ -23,7 +23,7 @@ import AuthIcon from '../../components/common/AuthIcon';
 import { COLORS } from '../../theme/colors';
 import { FONTS } from '../../theme/fonts';
 import { wp, hp, fontSize, moderateScale } from '../../utils/responsive';
-import { getConfigureGamesApi, saveConfigureGamesApi, getCoursesByClubApi } from '../../services/homeService';
+import { getConfigureGamesApi, saveConfigureGamesApi, getCoursesByClubApi, getTournamentByIdApi } from '../../services/homeService';
 import { getTournamentTeamsApi } from '../../services/teamService';
 
 const tournamentBg = require('../../assets/Images/tournament_bg.jpg');
@@ -51,6 +51,10 @@ const ConfigureGamesScreen = ({ navigation, route }) => {
 
   // Selected game for invited player
   const [selectedGameIndex, setSelectedGameIndex] = useState(0);
+  const [challengeLocked, setChallengeLocked] = useState(
+    !!tournament?.challengeLocked,
+  );
+  const [gameStarted, setGameStarted] = useState(!!tournament?.gameStarted);
 
   // Dropdown modal state
   const [modal, setModal] = useState({
@@ -74,6 +78,12 @@ const ConfigureGamesScreen = ({ navigation, route }) => {
 
   const statusUpper = String(tournament?.status || configData?.status || '').toUpperCase();
   const isStarted =
+    challengeLocked === true ||
+    tournament?.challengeLocked === true ||
+    configData?.challengeLocked === true ||
+    gameStarted === true ||
+    tournament?.gameStarted === true ||
+    configData?.gameStarted === true ||
     tournament?.isStarted === true ||
     tournament?.hasStarted === true ||
     tournament?.isInProgress === true ||
@@ -178,6 +188,25 @@ const ConfigureGamesScreen = ({ navigation, route }) => {
 
       const fullData = { ...data, availableCourses };
       setConfigData(fullData);
+
+      if (tournamentId && isUuid(String(tournamentId))) {
+        try {
+          const tRes = await getTournamentTeamsApi(tournamentId);
+          if (tRes?.challengeLocked === true || tRes?.data?.challengeLocked === true) {
+            setChallengeLocked(true);
+          }
+        } catch (lockErr) {
+          console.log('Challenge lock check note:', lockErr);
+        }
+        try {
+          const tDetail = await getTournamentByIdApi(tournamentId);
+          const fullT = tDetail?.tournament || tDetail?.data?.tournament || tDetail?.data || tDetail;
+          if (fullT?.challengeLocked === true) setChallengeLocked(true);
+          if (fullT?.gameStarted === true) setGameStarted(true);
+        } catch (startedErr) {
+          console.log('Tournament started check note:', startedErr);
+        }
+      }
 
       const numGames =
         fullData?.numberOfGames ||

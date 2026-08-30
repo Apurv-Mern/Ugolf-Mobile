@@ -631,7 +631,6 @@ import {
   ScrollView,
   StatusBar,
   BackHandler,
-  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
@@ -676,35 +675,22 @@ const ChoosePlanScreen = ({ navigation }) => {
       });
   }, []);
 
-  const handleBackWithConfirmation = () => {
-    Alert.alert(
-      'Exit Plan Selection?',
-      'Are you sure you want to go back to the login screen?',
-      [
-        {
-          text: 'Cancel',
-          style: 'cancel',
-        },
-        {
-          text: 'Exit to Login',
-          style: 'destructive',
-          onPress: () => {
-            navigation.reset({
-              index: 0,
-              routes: [{ name: 'Login' }],
-            });
-          },
-        },
-      ],
-      { cancelable: true }
-    );
+  const handleBack = () => {
+    if (navigation.canGoBack()) {
+      navigation.goBack();
+      return;
+    }
+    navigation.reset({
+      index: 0,
+      routes: [{ name: 'MainApp' }],
+    });
   };
 
   // Handle Android hardware back button
   useFocusEffect(
     React.useCallback(() => {
       const onBackPress = () => {
-        handleBackWithConfirmation();
+        handleBack();
         return true;
       };
 
@@ -718,18 +704,11 @@ const ChoosePlanScreen = ({ navigation }) => {
     }, [navigation])
   );
 
-  // Subscribe button
   const handleSubscribe = () => {
-    // Navigate directly to MainApp after subscription
     navigation.reset({
       index: 0,
       routes: [{ name: 'MainApp' }],
     });
-  };
-
-  // Header back button
-  const handleBack = () => {
-    handleBackWithConfirmation();
   };
 
   return (

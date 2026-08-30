@@ -202,7 +202,14 @@ const EditPlayersScreen = ({ navigation, route }) => {
   const existingPlayers = filteredFriends.filter((f) => f.isExisting);
   const invitePlayers = filteredFriends.filter((f) => !f.isExisting);
 
+  const challengeLocked =
+    !!tournamentParam?.challengeLocked || !!route?.params?.challengeLocked;
+
   const handleSave = async () => {
+    if (challengeLocked) {
+      navigation.goBack();
+      return;
+    }
     if (teamId && isUuid(String(teamId))) {
       setSaving(true);
       try {
@@ -284,7 +291,8 @@ const EditPlayersScreen = ({ navigation, route }) => {
         selected={!!item.selected && !isPending}
         badge={isPending ? 'PENDING' : undefined}
         onPress={() => {
-          if (!isPending) toggleSelect(item.id);
+          if (challengeLocked || isPending) return;
+          toggleSelect(item.id);
         }}
       />
     );
@@ -335,7 +343,7 @@ const EditPlayersScreen = ({ navigation, route }) => {
 
       <BottomDualActions
         leftTitle="CANCEL"
-        rightTitle={saving ? 'SAVING…' : 'SAVE'}
+        rightTitle={challengeLocked ? 'DONE' : saving ? 'SAVING…' : 'SAVE'}
         onLeftPress={() => navigation.goBack()}
         onRightPress={handleSave}
         rightLoading={saving}

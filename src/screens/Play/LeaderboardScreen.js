@@ -453,6 +453,7 @@ const LeaderboardScreen = ({ navigation, route }) => {
     Math.max(1, Number(tournament?.numberOfGames) || 1),
   );
   const [entries, setEntries] = useState([]);
+  const [challengeTeams, setChallengeTeams] = useState([]);
   const [meta, setMeta] = useState({
     tournamentName: tournament?.name || tournament?.title || 'Tournament',
     playMode,
@@ -509,9 +510,12 @@ const LeaderboardScreen = ({ navigation, route }) => {
           };
         }),
       );
+      const teams = data?.challenge?.teams || res?.challenge?.teams || [];
+      setChallengeTeams(Array.isArray(teams) ? teams : []);
     } catch (err) {
       console.log('Leaderboard load error:', err);
       setEntries([]);
+      setChallengeTeams([]);
     } finally {
       setLoading(false);
     }
@@ -532,9 +536,8 @@ const LeaderboardScreen = ({ navigation, route }) => {
     });
   };
 
-  const modeLabel = String(meta.playMode || playMode).toLowerCase().includes('challenge')
-    ? 'Challenge'
-    : 'Practice';
+  const isChallenge = String(meta.playMode || playMode).toLowerCase().includes('challenge');
+  const modeLabel = isChallenge ? 'Challenge' : 'Practice';
 
   return (
     <SafeAreaView style={styles.container} edges={['bottom']}>
@@ -583,52 +586,90 @@ const LeaderboardScreen = ({ navigation, route }) => {
             <ActivityIndicator color="#093A24" style={{ marginTop: hp(4) }} />
           ) : (
             <>
-              {/* Column Table Headers matching Figma */}
-              <View style={styles.tableHeaderRow}>
-                <Text style={[styles.colHeader, { flex: 2 }]}>Player (Ability Rank)</Text>
-                <Text style={[styles.colHeader, { flex: 1, textAlign: 'center' }]}>This Round</Text>
-                <Text style={[styles.colHeader, { flex: 1.2, textAlign: 'center' }]}>Personal Best (Last)</Text>
-              </View>
-
-              {entries.length === 0 ? (
-                <Text style={styles.emptyText}>
-                  No leaderboard entries yet.
-                </Text>
-              ) : (
-                entries.map((item) => (
-                  <View
-                    key={`${item.rank}-${item.name}`}
-                    style={[styles.playerCard, item.isYou && styles.playerCardYou]}
-                  >
-                    <View style={styles.playerInfoCol}>
-                      <Text style={styles.rankNum}>{item.rank}</Text>
-
-                      {item.avatarUrl ? (
-                        <Image source={{ uri: item.avatarUrl }} style={styles.playerAvatar} />
-                      ) : (
-                        <View style={styles.avatarPlaceholder}>
-                          <AuthIcon name="user" size={moderateScale(18)} color="#093A24" />
-                        </View>
-                      )}
-
-                      <Text style={styles.playerName} numberOfLines={1}>
-                        {item.name}
-                      </Text>
-                    </View>
-
-                    <Text style={styles.roundScoreText}>{item.roundScore}</Text>
-                    <Text style={styles.pbScoreText}>{item.personalBest}</Text>
+              {isChallenge ? (
+                <>
+                  <View style={styles.tableHeaderRow}>
+                    <Text style={[styles.colHeader, { flex: 2 }]}>Team / Player</Text>
+                    <Text style={[styles.colHeader, { flex: 1, textAlign: 'center' }]}>Score</Text>
                   </View>
-                ))
-              )}
+                  {challengeTeams.length === 0 ? (
+                    <Text style={styles.emptyText}>No leaderboard entries yet.</Text>
+                  ) : (
+                    challengeTeams.map((team) => (
+                      <View key={team.teamId || team.teamName} style={styles.teamBoardCard}>
+                        <View style={styles.teamBoardHeader}>
+                          <Text style={styles.teamBoardRank}>#{team.rank}</Text>
+                          <Text style={styles.teamBoardName} numberOfLines={1}>
+                            {team.teamName || 'Team'}
+                          </Text>
+                          <Text style={styles.teamBoardTotal}>{team.totalScore ?? 0}</Text>
+                        </View>
+                        {(team.players || []).map((player, idx) => {
+                          const playerId = player.playerUserId || player.userId || player.id;
+                          return (
+                            <View
+                              key={`${playerId || player.playerName || idx}`}
+                              style={styles.teamPlayerRow}
+                            >
+                              <Text style={styles.teamPlayerName} numberOfLines={1}>
+                                {player.playerName || player.name || 'Player'}
+                              </Text>
+                              <Text style={styles.teamPlayerScore}>{player.score ?? 0}</Text>
+                            </View>
+                          );
+                        })}
+                      </View>
+                    ))
+                  )}
+                </>
+              ) : (
+                <>
+                  <View style={styles.tableHeaderRow}>
+                    <Text style={[styles.colHeader, { flex: 2 }]}>Player (Ability Rank)</Text>
+                    <Text style={[styles.colHeader, { flex: 1, textAlign: 'center' }]}>This Round</Text>
+                    <Text style={[styles.colHeader, { flex: 1.2, textAlign: 'center' }]}>Personal Best (Last)</Text>
+                  </View>
 
-              {/* Info Box matching Figma */}
-              <View style={styles.infoBox}>
-                <AuthIcon name="info" size={moderateScale(16)} color="#093A24" style={{ marginTop: 2 }} />
-                <Text style={styles.infoBoxText}>
-                  The "Personal Best" column shows your last score for this course and segment. If it's your first time, the comparison will be empty.
-                </Text>
-              </View>
+                  {entries.length === 0 ? (
+                    <Text style={styles.emptyText}>
+                      No leaderboard entries yet.
+                    </Text>
+                  ) : (
+                    entries.map((item) => (
+                      <View
+                        key={`${item.rank}-${item.name}`}
+                        style={[styles.playerCard, item.isYou && styles.playerCardYou]}
+                      >
+                        <View style={styles.playerInfoCol}>
+                          <Text style={styles.rankNum}>{item.rank}</Text>
+
+                          {item.avatarUrl ? (
+                            <Image source={{ uri: item.avatarUrl }} style={styles.playerAvatar} />
+                          ) : (
+                            <View style={styles.avatarPlaceholder}>
+                              <AuthIcon name="user" size={moderateScale(18)} color="#093A24" />
+                            </View>
+                          )}
+
+                          <Text style={styles.playerName} numberOfLines={1}>
+                            {item.name}
+                          </Text>
+                        </View>
+
+                        <Text style={styles.roundScoreText}>{item.roundScore}</Text>
+                        <Text style={styles.pbScoreText}>{item.personalBest}</Text>
+                      </View>
+                    ))
+                  )}
+
+                  <View style={styles.infoBox}>
+                    <AuthIcon name="info" size={moderateScale(16)} color="#093A24" style={{ marginTop: 2 }} />
+                    <Text style={styles.infoBoxText}>
+                      The "Personal Best" column shows your last score for this course and segment. If it's your first time, the comparison will be empty.
+                    </Text>
+                  </View>
+                </>
+              )}
             </>
           )}
 
@@ -755,6 +796,56 @@ const styles = StyleSheet.create({
   playerCardYou: {
     borderColor: '#BCFF00',
     borderWidth: 2,
+  },
+  teamBoardCard: {
+    backgroundColor: COLORS.white,
+    borderWidth: 1.5,
+    borderColor: '#E2E8F0',
+    borderRadius: moderateScale(22),
+    paddingHorizontal: wp(4),
+    paddingVertical: hp(1.4),
+    marginBottom: hp(1.5),
+  },
+  teamBoardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: hp(1),
+  },
+  teamBoardRank: {
+    fontFamily: FONTS.bold,
+    fontSize: fontSize(14),
+    color: '#093A24',
+    width: wp(8),
+  },
+  teamBoardName: {
+    flex: 1,
+    fontFamily: FONTS.bold,
+    fontSize: fontSize(15),
+    color: '#093A24',
+  },
+  teamBoardTotal: {
+    fontFamily: FONTS.bold,
+    fontSize: fontSize(16),
+    color: '#093A24',
+  },
+  teamPlayerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: hp(0.7),
+    borderTopWidth: 1,
+    borderTopColor: '#EDF2F7',
+  },
+  teamPlayerName: {
+    flex: 1,
+    fontFamily: FONTS.medium,
+    fontSize: fontSize(13),
+    color: '#4A5568',
+  },
+  teamPlayerScore: {
+    fontFamily: FONTS.bold,
+    fontSize: fontSize(14),
+    color: '#093A24',
   },
   playerInfoCol: {
     flex: 2,

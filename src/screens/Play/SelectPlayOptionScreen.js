@@ -269,7 +269,7 @@ const SelectPlayOptionScreen = ({ navigation }) => {
         playMode: 'practice',
       });
     } else {
-      navigation.navigate('SelectTeamSize', {
+      navigation.navigate('SelectTournament', {
         playMode: 'challenge',
       });
     }

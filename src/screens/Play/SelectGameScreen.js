@@ -1174,7 +1174,7 @@ const SelectGameScreen = ({ navigation, route }) => {
 
       <View style={styles.btnFixedBottom}>
         <PrimaryPillButton
-          title={isCurrentGameCompleted ? 'GAME COMPLETED' : activeSession ? 'CONTINUE GAME' : 'CONTINUE'}
+          title={isCurrentGameCompleted ? 'GAME COMPLETED' : activeSession ? 'CONTINUE GAME' : 'START GAME'}
           onPress={handleContinue}
           loading={checking && !readiness}
           disabled={isCurrentGameCompleted || (hasBackend && !canStart)}

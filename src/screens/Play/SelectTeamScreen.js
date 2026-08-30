@@ -40,6 +40,9 @@ const SelectTeamScreen = ({ navigation, route }) => {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [ownSelectedTeamId, setOwnSelectedTeamId] = useState(null);
+  const [challengeLocked, setChallengeLocked] = useState(
+    !!route?.params?.tournament?.challengeLocked,
+  );
 
   // Load teams from backend API
   const loadTeams = async () => {
@@ -47,11 +50,16 @@ const SelectTeamScreen = ({ navigation, route }) => {
       setLoading(true);
       const tournamentId = route?.params?.tournament?.id || route?.params?.tournament?._id;
 
+      let tournamentTeams = [];
       if (tournamentId && isUuid(String(tournamentId))) {
         try {
           const tRes = await getTournamentTeamsApi(tournamentId);
           const backendOwnId = tRes?.ownSelectedTeamId || tRes?.data?.ownSelectedTeamId;
           if (backendOwnId) setOwnSelectedTeamId(String(backendOwnId));
+          if (tRes?.challengeLocked === true || tRes?.data?.challengeLocked === true) {
+            setChallengeLocked(true);
+          }
+          tournamentTeams = tRes?.teams || tRes?.data?.teams || tRes?.data || [];
         } catch (tErr) {
           console.log('getTournamentTeamsApi note:', tErr);
         }
@@ -65,17 +73,8 @@ const SelectTeamScreen = ({ navigation, route }) => {
         console.log('getTeamsApi error:', e);
       }
 
-      // Fallback: If user teams is empty, check tournament teams
-      if ((!rawTeams || rawTeams.length === 0) && tournamentId) {
-        try {
-          const tRes = await getTournamentTeamsApi(tournamentId);
-          const tTeams = tRes?.teams || tRes?.data?.teams || tRes?.data || (Array.isArray(tRes) ? tRes : []);
-          if (Array.isArray(tTeams) && tTeams.length > 0) {
-            rawTeams = tTeams;
-          }
-        } catch (tErr) {
-          console.log('getTournamentTeamsApi error:', tErr);
-        }
+      if ((!rawTeams || rawTeams.length === 0) && Array.isArray(tournamentTeams) && tournamentTeams.length > 0) {
+        rawTeams = tournamentTeams;
       }
 
       const formatted = (Array.isArray(rawTeams) ? rawTeams : []).map((t, index) => {
@@ -222,17 +221,29 @@ const SelectTeamScreen = ({ navigation, route }) => {
     if (tournamentId && isUuid(String(tournamentId)) && isUuid(String(selectedTeam.id))) {
       setSubmitting(true);
       try {
-        console.log(`====== EXECUTING SELECT TOURNAMENT TEAM API (Tournament: ${tournamentId}, Team: ${selectedTeam.id}) ======`);
-        const payload = { teamId: selectedTeam.id };
-        const selRes = await selectTournamentTeamApi(tournamentId, payload);
-        console.log('====== SELECT TOURNAMENT TEAM RES ======', JSON.stringify(selRes, null, 2));
-        Toast.show({
-          type: 'success',
-          text1: 'Team Selected',
-          text2: `Selected ${selectedTeam.name} for tournament!`,
-        });
+        if (!challengeLocked) {
+          const payload = { teamId: selectedTeam.id };
+          await selectTournamentTeamApi(tournamentId, payload);
+          Toast.show({
+            type: 'success',
+            text1: 'Team Selected',
+            text2: `Selected ${selectedTeam.name} for tournament!`,
+          });
+        }
       } catch (err) {
         console.log('Select tournament team note:', err);
+        const backendMsg =
+          err?.response?.data?.error ||
+          err?.response?.data?.message ||
+          err?.message ||
+          'Could not select this team.';
+        Toast.show({
+          type: 'error',
+          text1: 'Select Team Failed',
+          text2: backendMsg,
+        });
+        setSubmitting(false);
+        return;
       } finally {
         setSubmitting(false);
       }
@@ -308,7 +319,7 @@ const SelectTeamScreen = ({ navigation, route }) => {
         </TouchableOpacity>
 
         ── NEW (conditional): Hide for invited members, show for tournament creators ── */}
-        {!isInvitedMember && (
+        {!isInvitedMember && !challengeLocked && (
           // Only tournament creators can create a new team.
           // Invited members (e.g. Tiya accepted Siya's invite) should only
           // select from the teams already linked to the tournament.
@@ -368,7 +379,10 @@ const SelectTeamScreen = ({ navigation, route }) => {
                 <TouchableOpacity
                   key={item.id}
                   style={[styles.teamCard, isSelected && styles.teamCardSelected]}
-                  onPress={() => setSelectedTeamId(item.id)}
+                  onPress={() => {
+                    if (challengeLocked) return;
+                    setSelectedTeamId(item.id);
+                  }}
                   activeOpacity={0.85}
                 >
                   <Image source={item.image || teamBg} style={styles.teamThumbnail} />
@@ -381,7 +395,13 @@ const SelectTeamScreen = ({ navigation, route }) => {
                   {isMyTeam && (
                     <TouchableOpacity
                       style={styles.teamEditBtn}
-                      onPress={() => navigation.navigate('EditPlayers', { team: item, tournament: tournamentParam })}
+                      onPress={() =>
+                        navigation.navigate('EditPlayers', {
+                          team: item,
+                          tournament: tournamentParam,
+                          challengeLocked,
+                        })
+                      }
                       activeOpacity={0.7}
                     >
                       <Image source={editIcon} style={styles.editIconImg} resizeMode="contain" />

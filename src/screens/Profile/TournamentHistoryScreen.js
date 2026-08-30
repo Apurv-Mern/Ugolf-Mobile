@@ -23,6 +23,7 @@ import { getStartGameReadinessApi } from '../../services/playService';
 import {
   classifyTournamentPlay,
   groupGameHistoryByTournament,
+  isChallengePlayMode,
   unwrapReadiness,
 } from '../../utils/playProgress';
 
@@ -81,13 +82,12 @@ const TournamentHistoryScreen = ({ navigation }) => {
           id: group.tournamentId,
           tournamentName: group.title,
           date: group.lastCompletedAt ? formatDisplayDate(group.lastCompletedAt) : '',
-          score: group.totalScore,
-          parDiff: [
-            String(group.playMode || '').toLowerCase().includes('challenge')
-              ? 'Challenge'
-              : 'Practice',
-            group.games.length === 1 ? '1 game' : `${group.games.length} games`,
-          ].filter(Boolean).join(' · '),
+          score: null,
+          parDiff: group.games.length === 1 ? '1 game' : `${group.games.length} games`,
+          isChallenge: isChallengePlayMode(
+            group.playMode,
+            readinessById.get(group.tournamentId)?.playMode,
+          ),
           image: HISTORY_IMAGES[idx % HISTORY_IMAGES.length],
         })),
       );
@@ -166,9 +166,30 @@ const TournamentHistoryScreen = ({ navigation }) => {
               <Image source={item.image} style={styles.courseAvatar} />
 
               <View style={styles.infoContainer}>
-                <Text style={styles.tournamentName} numberOfLines={1}>
-                  {item.tournamentName}
-                </Text>
+                <View style={styles.nameRow}>
+                  <Text style={styles.tournamentName} numberOfLines={1}>
+                    {item.tournamentName}
+                  </Text>
+                  <View
+                    style={[
+                      styles.modeBadge,
+                      item.isChallenge
+                        ? styles.modeBadgeChallenge
+                        : styles.modeBadgePractice,
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.modeBadgeText,
+                        item.isChallenge
+                          ? styles.modeBadgeTextChallenge
+                          : styles.modeBadgeTextPractice,
+                      ]}
+                    >
+                      {item.isChallenge ? 'Challenge' : 'Practice'}
+                    </Text>
+                  </View>
+                </View>
                 {item.courseName ? (
                   <Text style={styles.courseName} numberOfLines={1}>
                     {item.courseName}
@@ -181,7 +202,6 @@ const TournamentHistoryScreen = ({ navigation }) => {
               </View>
 
               <View style={styles.scoreContainer}>
-                <Text style={styles.scoreText}>{item.score}</Text>
                 <Text style={styles.parDiffText}>{item.parDiff}</Text>
               </View>
             </TouchableOpacity>
@@ -262,11 +282,45 @@ const styles = StyleSheet.create({
   },
   infoContainer: {
     flex: 1,
+    marginRight: wp(2),
+  },
+  nameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: wp(1.5),
   },
   tournamentName: {
     fontFamily: FONTS.bold,
     fontSize: fontSize(14),
     color: '#093A24',
+    flexShrink: 1,
+  },
+  modeBadge: {
+    borderRadius: moderateScale(20),
+    paddingHorizontal: wp(2.2),
+    paddingVertical: hp(0.25),
+    borderWidth: 1.5,
+    flexShrink: 0,
+  },
+  modeBadgePractice: {
+    backgroundColor: '#093A24',
+    borderColor: 'rgba(255, 255, 255, 0.9)',
+  },
+  modeBadgeChallenge: {
+    backgroundColor: '#093A24',
+    borderColor: '#BCFF00',
+  },
+  modeBadgeText: {
+    fontFamily: FONTS.bold,
+    fontSize: fontSize(9),
+    letterSpacing: 0.5,
+    textTransform: 'uppercase',
+  },
+  modeBadgeTextPractice: {
+    color: '#FFFFFF',
+  },
+  modeBadgeTextChallenge: {
+    color: '#BCFF00',
   },
   courseName: {
     fontFamily: FONTS.medium,
