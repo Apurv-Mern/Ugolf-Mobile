@@ -25,6 +25,7 @@ import { FONTS } from '../../theme/fonts';
 import { wp, hp, fontSize, moderateScale } from '../../utils/responsive';
 import { getConfigureGamesApi, saveConfigureGamesApi, getCoursesByClubApi, getTournamentByIdApi } from '../../services/homeService';
 import { getTournamentTeamsApi } from '../../services/teamService';
+import { isChallengeLocked } from '../../utils/playProgress';
 
 const tournamentBg = require('../../assets/Images/tournament_bg.jpg');
 const isUuid = (id) => typeof id === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
@@ -192,7 +193,7 @@ const ConfigureGamesScreen = ({ navigation, route }) => {
       if (tournamentId && isUuid(String(tournamentId))) {
         try {
           const tRes = await getTournamentTeamsApi(tournamentId);
-          if (tRes?.challengeLocked === true || tRes?.data?.challengeLocked === true) {
+          if (tRes?.challengeLocked === true || tRes?.data?.challengeLocked === true || isChallengeLocked(tournament, tRes)) {
             setChallengeLocked(true);
           }
         } catch (lockErr) {
@@ -428,6 +429,18 @@ const ConfigureGamesScreen = ({ navigation, route }) => {
           }
           return;
         }
+      }
+
+      if (challengeLocked || isStarted) {
+        navigation.navigate('SelectGame', {
+          ...route?.params,
+          tournament,
+          selectedTeam,
+          selectedGameIndex,
+          gameNumber: (selectedGameIndex != null ? Number(selectedGameIndex) : 0) + 1,
+          playMode: route?.params?.playMode || tournament?.playMode || 'challenge',
+        });
+        return;
       }
 
       navigation.navigate('SelectTeam', {

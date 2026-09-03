@@ -552,9 +552,11 @@ const LeaderboardScreen = ({ navigation, route }) => {
         <ImageBackground source={tournamentBg} style={styles.header} resizeMode="cover">
           <View style={styles.headerOverlay} />
           <Text style={styles.bannerTitle}>Leaderboard</Text>
-          <Text style={styles.bannerSubtitle}>
-            Game {selectedGame} · {modeLabel} · {meta.tournamentName}
-          </Text>
+          <View style={styles.subPillBadge}>
+            <Text style={styles.bannerSubtitle} numberOfLines={1} ellipsizeMode="tail">
+              Game {selectedGame} · {modeLabel} · {meta.tournamentName}
+            </Text>
+          </View>
         </ImageBackground>
 
         <View style={styles.contentContainer}>
@@ -718,11 +720,23 @@ const styles = StyleSheet.create({
     fontSize: fontSize(28),
     color: COLORS.white,
   },
+  subPillBadge: {
+    alignSelf: 'flex-start',
+    backgroundColor: 'rgba(5, 25, 16, 0.70)',
+    borderRadius: moderateScale(10),
+    paddingHorizontal: wp(3),
+    paddingVertical: hp(0.5),
+    marginTop: hp(0.8),
+    borderWidth: 1,
+    borderColor: 'rgba(188, 255, 0, 0.35)',
+  },
   bannerSubtitle: {
-    fontFamily: FONTS.medium,
-    fontSize: fontSize(13),
-    color: 'rgba(255, 255, 255, 0.85)',
-    marginTop: hp(0.3),
+    fontFamily: FONTS.bold,
+    fontSize: fontSize(12),
+    color: '#FFFFFF',
+    textShadowColor: 'rgba(0, 0, 0, 0.9)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
   },
 
   // Content

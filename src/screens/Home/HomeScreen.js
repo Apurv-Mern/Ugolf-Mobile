@@ -2210,6 +2210,7 @@ import AuthIcon from '../../components/common/AuthIcon';
 import DotPattern from '../../components/common/DotPattern';
 import ProfileScreen from '../Profile/ProfileScreen';
 import { getTournamentsApi } from '../../services/homeService';
+import { getTournamentTeamsApi } from '../../services/teamService';
 import { getPlayerGameHistoryApi, getPlayerProfileApi, getTournamentLeaderboardApi } from '../../services/playerService';
 import { getUnreadNotificationsCountApi } from '../../services/notificationService';
 import {
@@ -2222,6 +2223,7 @@ import {
   groupGameHistoryByTournament,
   inProgressActivityMs,
   isChallengePlayMode,
+  isChallengeLocked,
   leaderboardIndicatesStarted,
   unwrapReadiness,
 } from '../../utils/playProgress';
@@ -2478,18 +2480,33 @@ const HomeScreen = ({ navigation }) => {
         if (hid && String(hid).includes('-')) idsToCheck.add(String(hid));
       });
 
-      await Promise.all(
-        Array.from(idsToCheck).map((id) =>
+      const teamsById = new Map();
+
+      await Promise.all([
+        ...Array.from(idsToCheck).map((id) =>
           getStartGameReadinessApi(id)
             .then((res) => readinessById.set(id, unwrapReadiness(res)))
             .catch(() => readinessById.set(id, null)),
         ),
-      );
+        ...Array.from(idsToCheck).map((id) =>
+          getTournamentTeamsApi(id)
+            .then((res) => teamsById.set(id, res))
+            .catch(() => teamsById.set(id, null)),
+        ),
+      ]);
 
       const formattedHomeTournaments = merged.map((item) => {
-        const play = classifyTournamentPlay(item.tournament, readinessById.get(String(item.id)));
+        const readinessObj = readinessById.get(String(item.id));
+        const teamsObj = teamsById.get(String(item.id));
+        const play = classifyTournamentPlay(item.tournament, readinessObj);
+        const isLocked =
+          item.tournament?.challengeLocked === true ||
+          item.challengeLocked === true ||
+          isChallengeLocked(item.tournament || item, readinessObj) ||
+          isChallengeLocked(item.tournament || item, teamsObj);
         return {
           ...item,
+          challengeLocked: isLocked,
           shareLinkEnabled: item.tournament?.shareLinkEnabled,
           joinUrl: item.tournament?.joinUrl,
           joinToken: item.tournament?.joinToken,
@@ -2621,7 +2638,12 @@ const HomeScreen = ({ navigation }) => {
       return;
     }
 
-    if (item.source === 'invited') {
+    if (
+      item.source === 'invited' ||
+      item.challengeLocked === true ||
+      item.tournament?.challengeLocked === true ||
+      isChallengeLocked(item.tournament || item)
+    ) {
       navigation.navigate('SelectGame', {
         tournament: item.tournament,
         playMode,
@@ -2870,12 +2892,12 @@ const HomeScreen = ({ navigation }) => {
                     (currentUserId &&
                       String(
                         item.tournament?.creatorUserId ||
-                          item.tournament?.creatorId ||
-                          item.tournament?.createdBy,
+                        item.tournament?.creatorId ||
+                        item.tournament?.createdBy,
                       ) === String(currentUserId))) &&
-                  (item.shareLinkEnabled === true ||
-                    (item.shareLinkEnabled !== false &&
-                      (!!item.joinUrl || !!item.joinToken))) ? (
+                    (item.shareLinkEnabled === true ||
+                      (item.shareLinkEnabled !== false &&
+                        (!!item.joinUrl || !!item.joinToken))) ? (
                     <TouchableOpacity
                       style={activeStyles.cardShareBtn}
                       onPress={(e) => {
@@ -2888,13 +2910,15 @@ const HomeScreen = ({ navigation }) => {
                     </TouchableOpacity>
                   ) : null}
                   {!item.gameStarted &&
-                  (item.source === 'mine' ||
-                  (currentUserId &&
-                    String(
-                      item.tournament?.creatorUserId ||
-                        item.tournament?.creatorId ||
-                        item.tournament?.createdBy,
-                    ) === String(currentUserId))) ? (
+                    !item.challengeLocked &&
+                    !item.tournament?.challengeLocked &&
+                    (item.source === 'mine' ||
+                      (currentUserId &&
+                        String(
+                          item.tournament?.creatorUserId ||
+                          item.tournament?.creatorId ||
+                          item.tournament?.createdBy,
+                        ) === String(currentUserId))) ? (
                     <TouchableOpacity
                       style={activeStyles.cardEditBtn}
                       onPress={(e) => {
@@ -2904,7 +2928,7 @@ const HomeScreen = ({ navigation }) => {
                           isEditing: true,
                           playMode:
                             item.playMode === 'CHALLENGE' ||
-                            String(item.tournament?.playMode || '').toUpperCase().includes('CHALLENGE')
+                              String(item.tournament?.playMode || '').toUpperCase().includes('CHALLENGE')
                               ? 'challenge'
                               : 'practice',
                         });
@@ -3441,7 +3465,7 @@ const activeStyles = StyleSheet.create({
   },
   tournamentOverlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(5, 22, 12, 0.55)',
+    backgroundColor: 'rgba(5, 22, 12, 0.45)',
   },
   tournamentInfo: {
     position: 'absolute',
@@ -3450,7 +3474,7 @@ const activeStyles = StyleSheet.create({
     right: 0,
     padding: moderateScale(14),
     paddingRight: wp(12),
-    backgroundColor: 'rgba(5, 25, 16, 0.70)',
+    backgroundColor: 'transparent',
   },
   tournamentTitle: {
     fontFamily: FONTS.bold,

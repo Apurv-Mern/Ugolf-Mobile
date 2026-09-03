@@ -13,6 +13,7 @@
 		420CB88ABE574C5FA79B3B7B /* Poppins-Light.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 1B9F8B4A71A54F28965C853F /* Poppins-Light.ttf */; };
 		46122CE71CCC40FE9EBED0DB /* Poppins-Italic.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 3AF2952AEA4547F999457EF2 /* Poppins-Italic.ttf */; };
 		62E712A160E841D8AA8CA5E7 /* Poppins-SemiBold.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 0E2A9AECD9C34E678705BC3E /* Poppins-SemiBold.ttf */; };
+		65CF09363048431E00383390 /* StoreKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 65CF09353048431E00383390 /* StoreKit.framework */; };
 		761780ED2CA45674006654EE /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 761780EC2CA45674006654EE /* AppDelegate.swift */; };
 		81AB9BB82411601600AC10FF /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 81AB9BB72411601600AC10FF /* LaunchScreen.storyboard */; };
 		843FF5B2B54B4A479EF720BF /* Poppins-Regular.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 36E455DDFBE843848C5F9F74 /* Poppins-Regular.ttf */; };
@@ -32,6 +33,8 @@
 		3B4392A12AC88292D35C810B /* Pods-UGolf.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-UGolf.debug.xcconfig"; path = "Target Support Files/Pods-UGolf/Pods-UGolf.debug.xcconfig"; sourceTree = "<group>"; };
 		5709B34CF0A7D63546082F79 /* Pods-UGolf.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-UGolf.release.xcconfig"; path = "Target Support Files/Pods-UGolf/Pods-UGolf.release.xcconfig"; sourceTree = "<group>"; };
 		5DCACB8F33CDC322A6C60F78 /* libPods-UGolf.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = "libPods-UGolf.a"; sourceTree = BUILT_PRODUCTS_DIR; };
+		65CF09343048431000383390 /* UGolf.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; name = UGolf.entitlements; path = UGolf/UGolf.entitlements; sourceTree = "<group>"; };
+		65CF09353048431E00383390 /* StoreKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = StoreKit.framework; path = System/Library/Frameworks/StoreKit.framework; sourceTree = SDKROOT; };
 		74C9D9804C774348BE175A63 /* Poppins-Medium.ttf */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = 9; includeInIndex = 0; lastKnownFileType = unknown; name = "Poppins-Medium.ttf"; path = "../src/assets/Fonts/Poppins-Medium.ttf"; sourceTree = "<group>"; };
 		761780EC2CA45674006654EE /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = AppDelegate.swift; path = UGolf/AppDelegate.swift; sourceTree = "<group>"; };
 		81AB9BB72411601600AC10FF /* LaunchScreen.storyboard */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = file.storyboard; name = LaunchScreen.storyboard; path = UGolf/LaunchScreen.storyboard; sourceTree = "<group>"; };
@@ -45,6 +48,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				0C80B921A6F3F58F76C31292 /* libPods-UGolf.a in Frameworks */,
+				65CF09363048431E00383390 /* StoreKit.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -54,6 +58,7 @@
 		13B07FAE1A68108700A75B9A /* UGolf */ = {
 			isa = PBXGroup;
 			children = (
+				65CF09343048431000383390 /* UGolf.entitlements */,
 				13B07FB51A68108700A75B9A /* Images.xcassets */,
 				761780EC2CA45674006654EE /* AppDelegate.swift */,
 				13B07FB61A68108700A75B9A /* Info.plist */,
@@ -66,6 +71,7 @@
 		2D16E6871FA4F8E400B85C8A /* Frameworks */ = {
 			isa = PBXGroup;
 			children = (
+				65CF09353048431E00383390 /* StoreKit.framework */,
 				ED297162215061F000B7C4FE /* JavaScriptCore.framework */,
 				5DCACB8F33CDC322A6C60F78 /* libPods-UGolf.a */,
 			);
@@ -299,10 +305,12 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CLANG_ENABLE_MODULES = YES;
-				CURRENT_PROJECT_VERSION = 1;
+				CODE_SIGN_ENTITLEMENTS = UGolf/UGolf.entitlements;
+				CURRENT_PROJECT_VERSION = 2;
 				DEVELOPMENT_TEAM = 5NBYKWJL2V;
 				ENABLE_BITCODE = NO;
 				INFOPLIST_FILE = UGolf/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = UGolf;
 				IPHONEOS_DEPLOYMENT_TARGET = 15.1;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -314,7 +322,7 @@
 					"-ObjC",
 					"-lc++",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = com.dotsquares.dizixcricket;
+				PRODUCT_BUNDLE_IDENTIFIER = com.dotsquares.ugolf;
 				PRODUCT_NAME = UGolf;
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
@@ -330,9 +338,11 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CLANG_ENABLE_MODULES = YES;
-				CURRENT_PROJECT_VERSION = 1;
+				CODE_SIGN_ENTITLEMENTS = UGolf/UGolf.entitlements;
+				CURRENT_PROJECT_VERSION = 2;
 				DEVELOPMENT_TEAM = 5NBYKWJL2V;
 				INFOPLIST_FILE = UGolf/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = UGolf;
 				IPHONEOS_DEPLOYMENT_TARGET = 15.1;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -344,7 +354,7 @@
 					"-ObjC",
 					"-lc++",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = com.dotsquares.dizixcricket;
+				PRODUCT_BUNDLE_IDENTIFIER = com.dotsquares.ugolf;
 				PRODUCT_NAME = UGolf;
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
 				SWIFT_VERSION = 5.0;

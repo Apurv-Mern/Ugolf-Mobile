@@ -2632,7 +2632,7 @@ SPEC CHECKSUMS:
   AsyncStorage: 163ab23f6aa37a58b7f2379d0b4ee7ac84d6655c
   BVLinearGradient: cb006ba232a1f3e4f341bb62c42d1098c284da70
   FBLazyVector: b3e7ad108f0d882e30445c5527d774e3fd432f3d
-  hermes-engine: c2f498259170609050000b5ffd0d562cf094602d
+  hermes-engine: 20bc976d9e5d52c2c4cee0fea66006756b37b09b
   MapboxCommon: d006256c4643860a7b3046af45d1671569b6c5ac
   MapboxCoreMaps: de1a4461d0ab5d65d907f06e8d82fdbe06bb3213
   MapboxMaps: 22340ae0e0d47b2e4761019b1d6c569ab04e088d

@@ -11,6 +11,75 @@ export function isChallengePlayMode(...values) {
   );
 }
 
+export function isChallengeLocked(tournament, readinessOrTeams) {
+  if (!tournament) return false;
+  if (
+    tournament.challengeLocked === true ||
+    tournament.isChallengeLocked === true ||
+    readinessOrTeams?.challengeLocked === true ||
+    readinessOrTeams?.data?.challengeLocked === true
+  ) {
+    return true;
+  }
+  if (
+    tournament.isInProgress === true ||
+    tournament.gameStarted === true ||
+    tournament.hasStarted === true ||
+    tournament.isStarted === true
+  ) {
+    return true;
+  }
+
+  const modeStr = String(
+    tournament.playMode || tournament.mode || readinessOrTeams?.playMode || '',
+  ).toUpperCase();
+  if (!modeStr.includes('CHALLENGE')) return false;
+
+  if (
+    readinessOrTeams?.opponentReady === true ||
+    readinessOrTeams?.opponentAccepted === true ||
+    readinessOrTeams?.data?.opponentReady === true ||
+    readinessOrTeams?.data?.opponentAccepted === true
+  ) {
+    return true;
+  }
+
+  const teams = Array.isArray(readinessOrTeams)
+    ? readinessOrTeams
+    : readinessOrTeams?.teams || readinessOrTeams?.data?.teams || readinessOrTeams?.data;
+
+  const ownTeamId =
+    readinessOrTeams?.ownSelectedTeamId ||
+    readinessOrTeams?.data?.ownSelectedTeamId ||
+    tournament?.ownSelectedTeamId ||
+    tournament?.selectedTeamId;
+
+  if (Array.isArray(teams) && teams.length >= 2) {
+    const hasAcceptedOpponent = teams.some((t) => {
+      const tId = String(t.id || t._id || t.teamId || '');
+      const ownId = ownTeamId ? String(ownTeamId) : null;
+      const isCreator = t.isCreator === true || t.isOwnTeam === true || (ownId && tId === ownId);
+      if (isCreator) return false;
+
+      const status = String(t.inviteStatus || t.status || t.state || '').toLowerCase().trim();
+      if (
+        status === 'declined' ||
+        status === 'rejected' ||
+        status === 'pending' ||
+        status === 'cancelled' ||
+        status === 'refused'
+      ) {
+        return false;
+      }
+      return true;
+    });
+
+    if (hasAcceptedOpponent) return true;
+  }
+
+  return false;
+}
+
 export function unwrapReadiness(res) {
   let cur = res;
   for (let i = 0; i < 4 && cur && typeof cur === 'object'; i += 1) {

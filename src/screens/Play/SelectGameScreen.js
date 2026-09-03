@@ -1047,6 +1047,8 @@ const SelectGameScreen = ({ navigation, route }) => {
           </View>
         ) : null}
 
+
+
         {completed.length > 0 ? (
           <Text style={styles.completedText}>
             Completed: Game {completed.join(', ')}

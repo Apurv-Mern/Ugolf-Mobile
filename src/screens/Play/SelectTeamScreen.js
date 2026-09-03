@@ -24,6 +24,7 @@ import { COLORS } from '../../theme/colors';
 import { FONTS } from '../../theme/fonts';
 import { wp, hp, fontSize, moderateScale, SCREEN_WIDTH } from '../../utils/responsive';
 import { getTeamsApi, getTeamByIdApi, getTournamentTeamsApi, selectTournamentTeamApi } from '../../services/teamService';
+import { isChallengeLocked } from '../../utils/playProgress';
 
 const teamBg = require('../../assets/Images/team_bg.jpg');
 const trophyImg = require('../../assets/Images/ trophy.png');
@@ -56,7 +57,7 @@ const SelectTeamScreen = ({ navigation, route }) => {
           const tRes = await getTournamentTeamsApi(tournamentId);
           const backendOwnId = tRes?.ownSelectedTeamId || tRes?.data?.ownSelectedTeamId;
           if (backendOwnId) setOwnSelectedTeamId(String(backendOwnId));
-          if (tRes?.challengeLocked === true || tRes?.data?.challengeLocked === true) {
+          if (tRes?.challengeLocked === true || tRes?.data?.challengeLocked === true || isChallengeLocked(route?.params?.tournament, tRes)) {
             setChallengeLocked(true);
           }
           tournamentTeams = tRes?.teams || tRes?.data?.teams || tRes?.data || [];
@@ -253,6 +254,15 @@ const SelectTeamScreen = ({ navigation, route }) => {
     const normalizedPlayMode = String(rawPlayMode).toLowerCase().trim();
     const isPracticeMode = normalizedPlayMode === 'practice' || normalizedPlayMode === 'practice_round' || normalizedPlayMode.includes('practice');
 
+    if (challengeLocked) {
+      navigation.navigate('SelectGame', {
+        tournament: tournamentParam,
+        selectedTeam,
+        playMode: 'challenge',
+      });
+      return;
+    }
+
     if (isPracticeMode) {
       navigation.navigate('SelectGame', {
         tournament: tournamentParam,
@@ -392,7 +402,7 @@ const SelectTeamScreen = ({ navigation, route }) => {
                     {/* <Text style={styles.teamLocation}>📍 {item.location}</Text> */}
                   </View>
 
-                  {isMyTeam && (
+                  {isMyTeam && !challengeLocked && (
                     <TouchableOpacity
                       style={styles.teamEditBtn}
                       onPress={() =>
