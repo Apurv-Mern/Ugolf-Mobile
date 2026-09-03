@@ -1,4 +1,0 @@
-D:/Apurv/Projects/golf_mobile/android/app/.cxx/Debug/4h481y6l/x86/CMakeFiles/_CMakeLTOTest-CXX/bin/CMakeFiles/foo.dir
-D:/Apurv/Projects/golf_mobile/android/app/.cxx/Debug/4h481y6l/x86/CMakeFiles/_CMakeLTOTest-CXX/bin/CMakeFiles/boo.dir
-D:/Apurv/Projects/golf_mobile/android/app/.cxx/Debug/4h481y6l/x86/CMakeFiles/_CMakeLTOTest-CXX/bin/CMakeFiles/edit_cache.dir
-D:/Apurv/Projects/golf_mobile/android/app/.cxx/Debug/4h481y6l/x86/CMakeFiles/_CMakeLTOTest-CXX/bin/CMakeFiles/rebuild_cache.dir
