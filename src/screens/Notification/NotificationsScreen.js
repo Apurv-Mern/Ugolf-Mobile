@@ -1214,6 +1214,7 @@ import {
   clearAllNotificationsApi,
   markNotificationReadApi,
   respondToNotificationApi,
+  getUnreadNotificationsCountApi,
 } from '../../services/notificationService';
 import { processDeepLink } from '../../utils/deepLinkHandler';
 
@@ -1322,6 +1323,14 @@ const NotificationsScreen = ({ navigation }) => {
   };
 
 
+  const refreshUnreadCount = async () => {
+    try {
+      await getUnreadNotificationsCountApi();
+    } catch (err) {
+      console.log('Unread notifications count note:', err);
+    }
+  };
+
   // ==========================================================
   // Fetch notifications
   // ==========================================================
@@ -1386,7 +1395,7 @@ const NotificationsScreen = ({ navigation }) => {
             item.updated_at;
 
           let displayTime = 'Now';
-          let isReceivedToday = true;
+          let isReceivedToday = false;
 
           if (rawDate) {
             try {
@@ -1461,7 +1470,47 @@ const NotificationsScreen = ({ navigation }) => {
           };
         });
 
-        const activeNotifications = formatted.filter(
+        const latestInviteIdByKey = new Map();
+        for (const n of formatted) {
+          const type = String(n.type || '').toUpperCase();
+          if (type !== 'TOURNAMENT_TEAM_INVITE') continue;
+          const tournamentId =
+            n.rawItem?.data?.tournamentId || n.rawItem?.tournamentId;
+          const teamId = n.rawItem?.data?.teamId || n.rawItem?.teamId;
+          if (!tournamentId || !teamId) continue;
+          const key = `${tournamentId}:${teamId}`;
+          const createdAt = new Date(n.rawItem?.createdAt || 0).getTime();
+          const prev = latestInviteIdByKey.get(key);
+          if (!prev || createdAt > prev.createdAt) {
+            latestInviteIdByKey.set(key, { id: n.id, createdAt });
+          }
+        }
+
+        const withHistoricalInvites = formatted.map((n) => {
+          const type = String(n.type || '').toUpperCase();
+          if (type !== 'TOURNAMENT_TEAM_INVITE') return n;
+          const tournamentId =
+            n.rawItem?.data?.tournamentId || n.rawItem?.tournamentId;
+          const teamId = n.rawItem?.data?.teamId || n.rawItem?.teamId;
+          if (!tournamentId || !teamId) return n;
+          const latest = latestInviteIdByKey.get(`${tournamentId}:${teamId}`);
+          if (latest && latest.id !== n.id) {
+            return {
+              ...n,
+              status: 'rejected',
+              actionable: false,
+              isRead: true,
+              rawItem: {
+                ...(n.rawItem || {}),
+                status: 'rejected',
+                actionable: false,
+              },
+            };
+          }
+          return n;
+        });
+
+        const activeNotifications = withHistoricalInvites.filter(
           (n) => !respondedIds.includes(String(n.id))
         );
 
@@ -1471,6 +1520,13 @@ const NotificationsScreen = ({ navigation }) => {
         setTodayList(activeToday);
         setEarlierList(activeEarlier);
       }
+
+      try {
+        await markAllNotificationsReadApi();
+      } catch (markErr) {
+        console.log('Mark all notifications read note:', markErr);
+      }
+      await refreshUnreadCount();
     } catch (err) {
       console.log(
         'Fetch notifications error:',
@@ -1756,6 +1812,7 @@ const NotificationsScreen = ({ navigation }) => {
     } finally {
       setLoadingId(null);
       setActionType(null);
+      await refreshUnreadCount();
     }
   };
 
@@ -1859,6 +1916,7 @@ const NotificationsScreen = ({ navigation }) => {
     } finally {
       setLoadingId(null);
       setActionType(null);
+      await refreshUnreadCount();
     }
   };
 
@@ -1867,8 +1925,8 @@ const NotificationsScreen = ({ navigation }) => {
   const renderNotificationCard = (item) => {
     const typeStr = (item.type || '').toUpperCase();
     const statusStr = String(item.status || item.rawItem?.status || '').toLowerCase();
-    const isUnreadStatus = statusStr === 'unread' || (!item.status && !item.isRead);
-    const isActionable = item.actionable !== false && item.rawItem?.actionable !== false;
+    const isUnreadStatus = statusStr === 'unread';
+    const isActionable = item.actionable === true;
 
     const isIncomingInvite =
       typeStr === 'TEAM_MEMBER_INVITE' ||
@@ -2096,45 +2154,31 @@ const NotificationsScreen = ({ navigation }) => {
             </View>
           )}
 
-        {todayList.length > 0 && (
+        {!loading &&
+        (todayList.length > 0 || earlierList.length > 0) ? (
           <>
-            <Text
-              style={
-                styles.sectionHeaderTitle
-              }
-            >
-              Today
-            </Text>
-
-
-            {todayList.map(
-              renderNotificationCard
+            <Text style={styles.sectionHeaderTitle}>Today</Text>
+            {todayList.length > 0 ? (
+              todayList.map(renderNotificationCard)
+            ) : (
+              <Text style={styles.emptySectionText}>No notifications today.</Text>
             )}
-          </>
-        )}
 
-
-
-
-        {earlierList.length > 0 && (
-          <>
             <Text
               style={[
                 styles.sectionHeaderTitle,
-                {
-                  marginTop: hp(2),
-                },
+                { marginTop: hp(2) },
               ]}
             >
               Earlier
             </Text>
-
-
-            {earlierList.map(
-              renderNotificationCard
+            {earlierList.length > 0 ? (
+              earlierList.map(renderNotificationCard)
+            ) : (
+              <Text style={styles.emptySectionText}>No earlier notifications.</Text>
             )}
           </>
-        )}
+        ) : null}
 
 
 
@@ -2215,6 +2259,12 @@ const styles = StyleSheet.create({
     color: '#093A24',
 
     marginBottom: hp(1.5),
+  },
+  emptySectionText: {
+    fontFamily: FONTS.medium,
+    fontSize: fontSize(13),
+    color: '#718096',
+    marginBottom: hp(1),
   },
 
 

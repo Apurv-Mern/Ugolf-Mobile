@@ -130,4 +130,4 @@ ios/DerivedData/
 ios/fastlane/report.xml
 ios/fastlane/Preview.html
 ios/fastlane/screenshots/
-ios/fastlane/test_output/
+ios/fastlane/test_output/Archive.zip

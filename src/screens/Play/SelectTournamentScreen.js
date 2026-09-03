@@ -557,7 +557,9 @@ import Toast from 'react-native-toast-message';
 import { getTournamentsApi, getTournamentByIdApi } from '../../services/homeService';
 import { getTournamentTeamsApi, getTeamsApi, getTeamByIdApi } from '../../services/teamService';
 import { getStartGameReadinessApi } from '../../services/playService';
+import { getTournamentLeaderboardApi } from '../../services/playerService';
 import { shareTournamentLink } from '../../utils/shareUtils';
+import { classifyTournamentPlay, leaderboardIndicatesStarted, unwrapReadiness, isChallengeLocked } from '../../utils/playProgress';
 
 import AuthButton from '../../components/common/AuthButton';
 import AuthIcon from '../../components/common/AuthIcon';
@@ -664,6 +666,7 @@ const SelectTournamentScreen = ({ navigation, route }) => {
   const [loading, setLoading] = useState(false);
 
   const playMode = route?.params?.playMode || 'challenge';
+  const showAllModes = route?.params?.showAllModes === true;
 
   const loadTournaments = async () => {
     setLoading(true);
@@ -714,7 +717,6 @@ const SelectTournamentScreen = ({ navigation, route }) => {
           combinedMap.set(String(id), { ...item, isMine: false, source: 'invited' });
         }
       });
-
       const tournamentList = Array.from(combinedMap.values());
 
       const formatted = tournamentList.map((item, index) => {
@@ -759,6 +761,14 @@ const SelectTournamentScreen = ({ navigation, route }) => {
         }
       }
 
+      const teamsResults = await Promise.allSettled(
+        formatted.map((t) =>
+          t.id && typeof t.id === 'string' && t.id.includes('-')
+            ? getTournamentTeamsApi(t.id).catch(() => null)
+            : Promise.resolve(null),
+        ),
+      );
+
       const readinessResults = await Promise.allSettled(
         formatted.map((t) =>
           t.id && typeof t.id === 'string' && t.id.includes('-')
@@ -767,42 +777,58 @@ const SelectTournamentScreen = ({ navigation, route }) => {
         ),
       );
 
-      const finalFormatted = formatted.map((item, idx) => {
-        const res =
-          readinessResults[idx]?.status === 'fulfilled'
-            ? readinessResults[idx]?.value?.data || readinessResults[idx]?.value
-            : null;
-        const hasActiveSession = Boolean(res?.activeSession?.id || res?.activeSession?.gameNumber);
-        const completedCount = Array.isArray(res?.completedGameNumbers) ? res.completedGameNumbers.length : 0;
-        const totalGames = Number(item.numberOfGames) || 1;
-        const allGamesDone = completedCount >= totalGames && totalGames > 0;
-        const statusUpper = String(item.status || '').toUpperCase();
+      const finalFormatted = await Promise.all(
+        formatted.map(async (item, idx) => {
+          const res =
+            readinessResults[idx]?.status === 'fulfilled'
+              ? unwrapReadiness(readinessResults[idx]?.value)
+              : null;
+          let play = classifyTournamentPlay(item, res);
+          if (!play.isInProgress && !play.isCompleted && item.id && String(item.id).includes('-')) {
+            try {
+              const board = await getTournamentLeaderboardApi(item.id, {
+                gameNumber: 1,
+                view: 'game',
+              });
+              if (leaderboardIndicatesStarted(board)) {
+                play = classifyTournamentPlay(item, res, { anyonePlayed: true });
+              }
+            } catch (_) {
+              /* keep original classification */
+            }
+          }
 
-        const isCompleted = item.isCompleted === true || item.completed === true || allGamesDone || statusUpper === 'COMPLETED';
-        const isInProgress =
-          !isCompleted &&
-          (hasActiveSession ||
-            completedCount > 0 ||
-            statusUpper === 'IN_PROGRESS' ||
-            statusUpper === 'ACTIVE' ||
-            item.isStarted === true ||
-            item.hasStarted === true);
+          const tTeamsRes =
+            teamsResults[idx]?.status === 'fulfilled'
+              ? teamsResults[idx]?.value
+              : null;
+          const challengeLocked =
+            item.challengeLocked === true ||
+            tTeamsRes?.challengeLocked === true ||
+            tTeamsRes?.data?.challengeLocked === true ||
+            isChallengeLocked(item, tTeamsRes);
 
-        return {
-          ...item,
-          isInProgress,
-          isCompleted,
-          hasActiveSession,
-          activeSession: res?.activeSession,
-        };
-      });
+          return {
+            ...item,
+            challengeLocked,
+            isInProgress: play.isInProgress,
+            isCompleted: play.isCompleted,
+            hasActiveSession: play.hasActiveSession,
+            activeSession: play.activeSession,
+            nextGameNumber: play.nextGameNumber,
+            numberOfGames: play.numberOfGames,
+            gameStarted: play.gameStarted,
+          };
+        }),
+      );
 
       // Filter out completed tournaments (they are shown on Home screen completed section)
       const uncompletedOnly = finalFormatted.filter((t) => t.isCompleted !== true);
 
       const currentPlayMode = (route?.params?.playMode || playMode || '').toLowerCase();
       let modeFiltered = uncompletedOnly;
-      if (currentPlayMode) {
+      // Home "See all" should list every mine + invited event, both modes.
+      if (!showAllModes && currentPlayMode) {
         modeFiltered = uncompletedOnly.filter((t) => {
           const tMode = (t.playMode || '').toLowerCase();
           if (currentPlayMode === 'practice' || currentPlayMode.includes('practice')) {
@@ -859,7 +885,7 @@ const SelectTournamentScreen = ({ navigation, route }) => {
       };
       const subscription = BackHandler.addEventListener('hardwareBackPress', onBackPress);
       return () => subscription.remove();
-    }, [navigation])
+    }, [navigation, route?.params?.showAllModes, route?.params?.playMode])
   );
 
   const myTournaments = tournaments.filter(
@@ -890,78 +916,128 @@ const SelectTournamentScreen = ({ navigation, route }) => {
         >
           <View style={styles.tournamentCardOverlay} />
 
-          <View
-            style={[
-              styles.cardSelectCircle,
-              isSelected && styles.cardSelectCircleSelected,
-            ]}
-          >
-            {isSelected && (
-              <AuthIcon name="check" size={moderateScale(10)} color="#093A24" />
-            )}
-          </View>
-
-          {(() => {
-            const status = String(item.status || '').toUpperCase();
-            const isCompleted = item.isCompleted === true || status === 'COMPLETED' || status === 'CANCELLED';
-            const isInProgress =
-              item.isInProgress === true ||
-              item.hasStarted === true ||
-              status === 'IN_PROGRESS' ||
-              status === 'ACTIVE';
-
-            if (isInProgress) {
+          {/* Top Row: Mode Badge on Left, Action Buttons & Selection Circle on Right */}
+          <View style={styles.cardTopRow}>
+            {/* Mode Badge */}
+            {(() => {
+              const modeStr = String(item.playMode || '').toLowerCase();
+              const isChallenge = modeStr.includes('challenge');
+              if (!modeStr) return <View />;
               return (
-                <View style={styles.inProgressBadge}>
-                  <Text style={styles.inProgressBadgeText}>IN PROGRESS</Text>
+                <View
+                  style={[
+                    styles.modeBadgeInline,
+                    isChallenge ? styles.modeBadgeChallenge : styles.modeBadgePractice,
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.modeBadgeText,
+                      isChallenge
+                        ? styles.modeBadgeTextChallenge
+                        : styles.modeBadgeTextPractice,
+                    ]}
+                  >
+                    {isChallenge ? 'Challenge' : 'Practice'}
+                  </Text>
                 </View>
               );
-            }
+            })()}
 
-            const canEdit = item.isMine && !isCompleted && !isInProgress && !item.isStarted;
-            const canShare = !isCompleted && !isInProgress && !item.isStarted && (item.shareLinkEnabled === true || (item.shareLinkEnabled !== false && (!!item.joinUrl || !!item.joinToken)));
+            {/* Header Right Group: Status, Share, Edit, Checkmark */}
+            <View style={styles.cardHeaderRightGroup}>
+              {(() => {
+                const status = String(item.status || '').toUpperCase();
+                const isCompleted = item.isCompleted === true || status === 'COMPLETED' || status === 'CANCELLED';
+                const isInProgress =
+                  item.isInProgress === true ||
+                  item.hasStarted === true ||
+                  status === 'IN_PROGRESS' ||
+                  status === 'ACTIVE';
 
-            if (!canEdit && !canShare) return null;
+                const canEdit =
+                  item.isMine &&
+                  !isCompleted &&
+                  !isInProgress &&
+                  !item.isStarted &&
+                  !item.gameStarted &&
+                  !item.challengeLocked;
+                const canShare =
+                  item.isMine &&
+                  !isCompleted &&
+                  !isInProgress &&
+                  !item.isStarted &&
+                  (item.shareLinkEnabled === true ||
+                    (item.shareLinkEnabled !== false &&
+                      (!!item.joinUrl || !!item.joinToken)));
 
-            return (
-              <View style={styles.cardActionsRow}>
-                {canShare && (
-                  <TouchableOpacity
-                    style={styles.cardShareBtn}
-                    onPress={() => shareTournamentLink(item)}
-                    activeOpacity={0.7}
-                  >
-                    <AuthIcon name="share" size={moderateScale(14)} color="#093A24" />
-                  </TouchableOpacity>
-                )}
-                {canEdit && (
-                  <TouchableOpacity
-                    style={styles.cardEditBtn}
-                    onPress={() =>
-                      navigation.navigate('CreateTournament', {
-                        tournament: item,
-                        isEditing: true,
-                        ...route?.params,
-                      })
-                    }
-                    activeOpacity={0.7}
-                  >
-                    <Image source={editIcon} style={styles.editIconImg} resizeMode="contain" />
-                  </TouchableOpacity>
+                return (
+                  <>
+                    {isInProgress ? (
+                      <View style={styles.inProgressBadgeInline}>
+                        <Text style={styles.inProgressBadgeText}>IN PROGRESS</Text>
+                      </View>
+                    ) : null}
+                    {canShare ? (
+                      <TouchableOpacity
+                        style={styles.cardShareBtnInline}
+                        onPress={() => shareTournamentLink(item)}
+                        activeOpacity={0.7}
+                      >
+                        <AuthIcon name="share" size={moderateScale(13)} color="#093A24" />
+                      </TouchableOpacity>
+                    ) : null}
+                    {canEdit ? (
+                      <TouchableOpacity
+                        style={styles.cardEditBtnInline}
+                        onPress={() =>
+                          navigation.navigate('CreateTournament', {
+                            tournament: item,
+                            isEditing: true,
+                            playMode: String(item.playMode || route?.params?.playMode || 'practice')
+                              .toLowerCase()
+                              .includes('challenge')
+                              ? 'challenge'
+                              : 'practice',
+                          })
+                        }
+                        activeOpacity={0.7}
+                      >
+                        <Image source={editIcon} style={styles.editIconImg} resizeMode="contain" />
+                      </TouchableOpacity>
+                    ) : null}
+                  </>
+                );
+              })()}
+
+              {/* Selection Checkmark Circle */}
+              <View
+                style={[
+                  styles.cardSelectCircleInline,
+                  isSelected && styles.cardSelectCircleSelected,
+                ]}
+              >
+                {isSelected && (
+                  <AuthIcon name="check" size={moderateScale(11)} color="#093A24" />
                 )}
               </View>
-            );
-          })()}
+            </View>
+          </View>
 
+          {/* Bottom Info Content */}
           <View style={styles.tournamentCardContent}>
-            <Text style={styles.tournamentCardName} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>{item.title}</Text>
+            <Text style={styles.tournamentCardName} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
+              {item.title}
+            </Text>
             <View style={styles.tournamentMetaRow}>
               <View style={styles.metaBadge}>
                 <Text style={styles.metaBadgeText}>📅 {item.date}</Text>
               </View>
               {item.location ? (
                 <View style={[styles.metaBadge, { flexShrink: 1, maxWidth: wp(50) }]}>
-                  <Text style={styles.metaBadgeText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>📍 {item.location}</Text>
+                  <Text style={styles.metaBadgeText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
+                    📍 {item.location}
+                  </Text>
                 </View>
               ) : null}
               {item.joined && item.joined !== '—' && item.joined !== 0 ? (
@@ -987,7 +1063,11 @@ const SelectTournamentScreen = ({ navigation, route }) => {
         showsVerticalScrollIndicator={false}
       >
         {/* ── 1. Header with BG Image ── */}
-        <ImageBackground source={tournamentBg} style={styles.header} resizeMode="cover">
+        <ImageBackground
+          source={tournamentBg}
+          style={[styles.header, showAllModes && styles.headerWithoutCreate]}
+          resizeMode="cover"
+        >
           <View style={styles.headerOverlay} />
 
           {/* Back Button */}
@@ -1002,24 +1082,27 @@ const SelectTournamentScreen = ({ navigation, route }) => {
           <Text style={styles.bannerTitle}>Select Tournament</Text>
         </ImageBackground>
 
-        {/* ── 2. Overlapping Create Tournament Card (overlaps header via negative marginTop) ── */}
-        <TouchableOpacity
-          style={styles.createHeroCard}
-          onPress={() => navigation.navigate('CreateTournament', { ...route?.params })}
-          activeOpacity={0.88}
-        >
-          <View style={styles.createHeroIconCircle}>
-            <AuthIcon name="plus" size={moderateScale(24)} color="#093A24" />
-          </View>
+        {!showAllModes ? (
+          <TouchableOpacity
+            style={styles.createHeroCard}
+            onPress={() =>
+              navigation.navigate('CreateTournament', { ...route?.params })
+            }
+            activeOpacity={0.88}
+          >
+            <View style={styles.createHeroIconCircle}>
+              <AuthIcon name="plus" size={moderateScale(24)} color="#093A24" />
+            </View>
 
-          <View style={styles.createHeroTextWrap}>
-            <Text style={styles.createHeroLabel}>NEW TOURNAMENT</Text>
-            <Text style={styles.createHeroTitle}>CREATE TOURNAMENT</Text>
-          </View>
-        </TouchableOpacity>
+            <View style={styles.createHeroTextWrap}>
+              <Text style={styles.createHeroLabel}>NEW TOURNAMENT</Text>
+              <Text style={styles.createHeroTitle}>CREATE TOURNAMENT</Text>
+            </View>
+          </TouchableOpacity>
+        ) : null}
 
         {/* ── 3. Tournaments Sections ── */}
-        <View style={styles.section}>
+        <View style={[styles.section, showAllModes && styles.sectionWithoutCreate]}>
           {loading ? (
             <ActivityIndicator size="large" color="#093A24" style={{ marginTop: hp(4) }} />
           ) : tournaments.length === 0 ? (
@@ -1027,9 +1110,11 @@ const SelectTournamentScreen = ({ navigation, route }) => {
               <Text style={{ fontFamily: FONTS.bold, fontSize: fontSize(16), color: '#093A24', textAlign: 'center' }}>
                 No tournaments created or invited yet
               </Text>
-              <Text style={{ fontFamily: FONTS.medium, fontSize: fontSize(13), color: '#718096', marginTop: hp(0.8), textAlign: 'center' }}>
-                Tap "CREATE TOURNAMENT" above to set up your first event!
-              </Text>
+              {!showAllModes ? (
+                <Text style={{ fontFamily: FONTS.medium, fontSize: fontSize(13), color: '#718096', marginTop: hp(0.8), textAlign: 'center' }}>
+                  Tap "CREATE TOURNAMENT" above to set up your first event!
+                </Text>
+              ) : null}
             </View>
           ) : (
             <>
@@ -1064,17 +1149,43 @@ const SelectTournamentScreen = ({ navigation, route }) => {
           onPress={() => {
             const selectedT = tournaments.find(t => t.id === selectedTournamentId);
             if (selectedT) {
+              const playMode =
+                (selectedT.playMode || route?.params?.playMode || 'practice').toLowerCase() ===
+                  'challenge'
+                  ? 'challenge'
+                  : 'practice';
               if (selectedT.isInProgress && selectedT.activeSession?.id) {
                 navigation.navigate('ActiveGame', {
                   tournament: selectedT,
                   sessionId: selectedT.activeSession.id,
-                  gameNumber: Number(selectedT.activeSession.gameNumber) || 1,
-                  playMode: (selectedT.playMode || route?.params?.playMode || 'practice').toLowerCase() === 'challenge' ? 'challenge' : 'practice',
+                  gameNumber: Number(selectedT.activeSession.gameNumber) || selectedT.nextGameNumber || 1,
+                  playMode,
+                });
+              } else if (selectedT.isInProgress) {
+                navigation.navigate('SelectGame', {
+                  ...route?.params,
+                  tournament: selectedT,
+                  playMode,
+                  gameNumber: selectedT.nextGameNumber || 1,
+                  selectedGameIndex: Math.max(0, (selectedT.nextGameNumber || 1) - 1),
+                });
+              } else if (
+                selectedT.source === 'invited' ||
+                selectedT.isMine === false ||
+                selectedT.challengeLocked === true
+              ) {
+                navigation.navigate('SelectGame', {
+                  ...route?.params,
+                  tournament: selectedT,
+                  playMode,
+                  gameNumber: selectedT.nextGameNumber || 1,
+                  selectedGameIndex: Math.max(0, (selectedT.nextGameNumber || 1) - 1),
                 });
               } else {
                 navigation.navigate('ConfigureGames', {
                   ...route?.params,
                   tournament: selectedT,
+                  playMode,
                 });
               }
             } else {
@@ -1112,6 +1223,9 @@ const styles = StyleSheet.create({
     paddingBottom: hp(7.5), // Extra bottom padding so card overlaps header cleanly
     paddingHorizontal: wp(5),
     position: 'relative',
+  },
+  headerWithoutCreate: {
+    paddingBottom: hp(3.5),
   },
   headerOverlay: {
     ...StyleSheet.absoluteFillObject,
@@ -1195,6 +1309,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: wp(5),
     marginTop: hp(2.5),
   },
+  sectionWithoutCreate: {
+    marginTop: hp(2),
+  },
   sectionTitle: {
     fontFamily: FONTS.bold,
     fontSize: fontSize(17),
@@ -1215,39 +1332,112 @@ const styles = StyleSheet.create({
   },
   tournamentCardBg: {
     flex: 1,
-    padding: wp(4),
-    justifyContent: 'flex-end',
+    padding: wp(3.5),
+    justifyContent: 'space-between',
+    minHeight: hp(19.5),
   },
   tournamentCardOverlay: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: 'rgba(5, 25, 16, 0.55)',
     borderRadius: moderateScale(18),
   },
-  cardSelectCircle: {
-    position: 'absolute',
-    top: wp(4),
-    right: wp(4),
-    width: moderateScale(22),
-    height: moderateScale(22),
-    borderRadius: moderateScale(11),
+  cardTopRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    zIndex: 10,
+    width: '100%',
+    marginBottom: hp(1),
+  },
+  cardHeaderRightGroup: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: wp(1.8),
+  },
+  cardSelectCircleInline: {
+    width: moderateScale(24),
+    height: moderateScale(24),
+    borderRadius: moderateScale(12),
     borderWidth: 2,
     borderColor: '#BCFF00',
     backgroundColor: 'transparent',
     justifyContent: 'center',
     alignItems: 'center',
-    zIndex: 3,
   },
   cardSelectCircleSelected: {
     backgroundColor: '#BCFF00',
   },
+  cardShareBtnInline: {
+    width: moderateScale(24),
+    height: moderateScale(24),
+    borderRadius: moderateScale(12),
+    backgroundColor: '#BCFF00',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  cardEditBtnInline: {
+    width: moderateScale(24),
+    height: moderateScale(24),
+    borderRadius: moderateScale(12),
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  editIconImg: {
+    width: moderateScale(13),
+    height: moderateScale(13),
+    tintColor: '#093A24',
+  },
+  inProgressBadgeInline: {
+    backgroundColor: '#093A24',
+    borderWidth: 1,
+    borderColor: '#BCFF00',
+    borderRadius: moderateScale(12),
+    paddingHorizontal: wp(2.5),
+    paddingVertical: hp(0.4),
+  },
+  inProgressBadgeText: {
+    fontFamily: FONTS.bold,
+    fontSize: fontSize(9.5),
+    color: '#BCFF00',
+    letterSpacing: 0.3,
+  },
+  modeBadgeInline: {
+    borderRadius: moderateScale(20),
+    paddingHorizontal: wp(3),
+    paddingVertical: hp(0.45),
+    borderWidth: 1.5,
+  },
+  modeBadgePractice: {
+    backgroundColor: 'rgba(9, 58, 36, 0.85)',
+    borderColor: 'rgba(255, 255, 255, 0.9)',
+  },
+  modeBadgeChallenge: {
+    backgroundColor: 'rgba(9, 58, 36, 0.85)',
+    borderColor: '#BCFF00',
+  },
+  modeBadgeText: {
+    fontFamily: FONTS.bold,
+    fontSize: fontSize(10.5),
+    letterSpacing: 0.6,
+    textTransform: 'uppercase',
+  },
+  modeBadgeTextPractice: {
+    color: '#FFFFFF',
+  },
+  modeBadgeTextChallenge: {
+    color: '#BCFF00',
+  },
   tournamentCardContent: {
     zIndex: 2,
-    paddingRight: wp(10),
+    paddingRight: wp(4),
+    marginTop: hp(0.8),
   },
   tournamentCardName: {
     fontFamily: FONTS.bold,
-    fontSize: fontSize(18),
+    fontSize: fontSize(17),
     color: COLORS.white,
+    marginTop: hp(0.5),
     marginBottom: hp(0.8),
     textShadowColor: 'rgba(0, 0, 0, 0.9)',
     textShadowOffset: {
@@ -1280,62 +1470,6 @@ const styles = StyleSheet.create({
       height: 1,
     },
     textShadowRadius: 3,
-  },
-  cardActionsRow: {
-    position: 'absolute',
-    top: wp(3.5),
-    right: wp(13),
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: wp(1.8),
-    zIndex: 10,
-  },
-  cardShareBtn: {
-    width: moderateScale(26),
-    height: moderateScale(26),
-    borderRadius: moderateScale(13),
-    backgroundColor: '#BCFF00',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  cardEditBtn: {
-    width: moderateScale(26),
-    height: moderateScale(26),
-    borderRadius: moderateScale(13),
-    backgroundColor: 'rgba(255, 255, 255, 0.95)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  editIconImg: {
-    width: moderateScale(15),
-    height: moderateScale(15),
-    tintColor: '#093A24',
-  },
-  inProgressBadgeInline: {
-    backgroundColor: '#093A24',
-    borderWidth: 1,
-    borderColor: '#BCFF00',
-    borderRadius: moderateScale(12),
-    paddingHorizontal: wp(2.5),
-    paddingVertical: hp(0.4),
-  },
-  inProgressBadge: {
-    position: 'absolute',
-    top: wp(3.5),
-    right: wp(13),
-    backgroundColor: '#093A24',
-    borderWidth: 1,
-    borderColor: '#BCFF00',
-    borderRadius: moderateScale(12),
-    paddingHorizontal: wp(2.5),
-    paddingVertical: hp(0.4),
-    zIndex: 10,
-  },
-  inProgressBadgeText: {
-    fontFamily: FONTS.bold,
-    fontSize: fontSize(9.5),
-    color: '#BCFF00',
-    letterSpacing: 0.3,
   },
 
   // ── 4. Fixed Bottom Button ──

@@ -219,6 +219,18 @@ const normalizeStateName = (rawState, rawCity = '') => {
   return null;
 };
 
+const TEAM_SIZE_OPTIONS = [
+  { value: '1', label: '1 player — Head-to-Head' },
+  { value: '2', label: '2 players — Pairs' },
+  { value: '3', label: '3 players — Three Ball' },
+  { value: '4', label: '4 players — Team Round' },
+  { value: '5', label: '5 players — Tournament Play' },
+];
+
+const teamSizeLabel = (value) =>
+  TEAM_SIZE_OPTIONS.find((option) => option.value === String(value))?.label ||
+  `${value} players`;
+
 const CreateTournamentScreen = ({ navigation, route }) => {
   const currentUser = useSelector((state) => state.auth.user);
   const currentUserId = currentUser?.id || currentUser?._id;
@@ -259,6 +271,20 @@ const CreateTournamentScreen = ({ navigation, route }) => {
   const [shareLink, setShareLink] = useState(true);
   const [inviteStatus, setInviteStatus] = useState('Invite only');
   const [numberOfGames, setNumberOfGames] = useState('1');
+  const initialPlayMode = String(
+    route?.params?.playMode || tournamentParam?.playMode || 'PRACTICE',
+  ).toUpperCase();
+  const isChallengeMode = initialPlayMode.includes('CHALLENGE');
+  const [teamSize, setTeamSize] = useState(
+    String(
+      route?.params?.teamSize ||
+        tournamentParam?.teamSize ||
+        (isChallengeMode ? '4' : '5'),
+    ),
+  );
+  const [challengeLocked, setChallengeLocked] = useState(
+    !!tournamentParam?.challengeLocked,
+  );
   const [submitting, setSubmitting] = useState(false);
   const [submissionError, setSubmissionError] = useState('');
 
@@ -336,7 +362,8 @@ const CreateTournamentScreen = ({ navigation, route }) => {
         status === 'COMPLETED' ||
         status === 'CANCELLED' ||
         tournamentParam.isStarted === true ||
-        tournamentParam.hasStarted === true
+        tournamentParam.hasStarted === true ||
+        tournamentParam.gameStarted === true
       ) {
         Toast.show({
           type: 'info',
@@ -384,6 +411,9 @@ const CreateTournamentScreen = ({ navigation, route }) => {
       if (tournamentParam.numberOfGames) {
         setNumberOfGames(String(tournamentParam.numberOfGames));
       }
+      if (tournamentParam.teamSize) {
+        setTeamSize(String(tournamentParam.teamSize));
+      }
       if (tournamentParam.inviteStatus) {
         setInviteStatus(
           tournamentParam.inviteStatus === 'OPEN' || tournamentParam.inviteStatus === 'Open to all'
@@ -420,6 +450,17 @@ const CreateTournamentScreen = ({ navigation, route }) => {
               }
               if (fullT.clubId) {
                 setGolfClubId(fullT.clubId);
+              }
+              if (fullT.teamSize) setTeamSize(String(fullT.teamSize));
+              if (fullT.numberOfGames) setNumberOfGames(String(fullT.numberOfGames));
+              if (fullT.challengeLocked === true) setChallengeLocked(true);
+              if (fullT.gameStarted === true || fullT.hasStarted === true) {
+                Toast.show({
+                  type: 'info',
+                  text1: 'Editing Disabled',
+                  text2: 'Editing is disabled once tournament games have started.',
+                });
+                navigation.goBack();
               }
             }
           })
@@ -707,6 +748,15 @@ const CreateTournamentScreen = ({ navigation, route }) => {
   };
 
   const handleCreateTournament = async () => {
+    if (isEditing && challengeLocked) {
+      Toast.show({
+        type: 'info',
+        text1: 'Challenge Locked',
+        text2: 'This challenge is locked after the opponent accepted.',
+      });
+      navigation.goBack();
+      return;
+    }
     setSubmissionError('');
     setTournamentNameError('');
     setDescriptionError('');
@@ -772,13 +822,19 @@ const CreateTournamentScreen = ({ navigation, route }) => {
         return 'INVITE_ONLY';
       };
 
-      const playModeParam = route?.params?.playMode ? String(route.params.playMode).toUpperCase() : 'PRACTICE';
-      // Admin mobile-flow: Practice defaults to teamSize 5; Challenge uses selected size
-      const teamSizeParam = route?.params?.teamSize
-        ? parseInt(route.params.teamSize, 10)
-        : playModeParam === 'PRACTICE'
-          ? 5
-          : 4;
+      const rawPlayMode = isEditing
+        ? (tournamentParam?.playMode || tournamentParam?.mode || route?.params?.playMode)
+        : route?.params?.playMode;
+      const playModeParam = String(rawPlayMode || 'PRACTICE').toUpperCase().includes('CHALLENGE')
+        ? 'CHALLENGE'
+        : 'PRACTICE';
+      const parsedTeamSize = parseInt(teamSize, 10);
+      const teamSizeParam =
+        playModeParam === 'CHALLENGE'
+          ? Number.isFinite(parsedTeamSize)
+            ? parsedTeamSize
+            : 4
+          : 5;
 
       const matchedClub = clubsList.find((c) => (c.clubName || c.name || '').toLowerCase() === String(golfClub).toLowerCase());
       const resolvedClubId = golfClubId || matchedClub?.clubId || matchedClub?.id || matchedClub?._id || '';
@@ -869,10 +925,11 @@ const CreateTournamentScreen = ({ navigation, route }) => {
             text2: 'Please configure courses for the new golf club.',
           });
           navigation.navigate('ConfigureGames', {
+            ...route?.params,
             tournament: formattedT,
             isCreator: true,
             isEditing: true,
-            ...route?.params,
+            playMode: String(playModeParam).toLowerCase(),
           });
           return;
         }
@@ -1230,11 +1287,42 @@ const CreateTournamentScreen = ({ navigation, route }) => {
           </View>
         </TouchableOpacity>
 
+        {isChallengeMode ? (
+          <>
+            <Text style={styles.formLabel}>Team Size</Text>
+            <TouchableOpacity
+              style={[
+                styles.formDropdownTrigger,
+                challengeLocked && { opacity: 0.55 },
+              ]}
+              onPress={() => {
+                if (challengeLocked) return;
+                handleOpenDropdown('teamSize', TEAM_SIZE_OPTIONS, setTeamSize);
+              }}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.dropdownValueText}>{teamSizeLabel(teamSize)}</Text>
+              <AuthIcon
+                name="chevron-left"
+                size={moderateScale(14)}
+                color="#093A24"
+                style={{ transform: [{ rotate: '-90deg' }] }}
+              />
+            </TouchableOpacity>
+          </>
+        ) : null}
+
         {/* Number Of Games (Dropdown) */}
         <Text style={styles.formLabel}>Number Of Games</Text>
         <TouchableOpacity
-          style={styles.formDropdownTrigger}
-          onPress={() => handleOpenDropdown('games', ['1', '2', '3'], setNumberOfGames)}
+          style={[
+            styles.formDropdownTrigger,
+            challengeLocked && { opacity: 0.55 },
+          ]}
+          onPress={() => {
+            if (challengeLocked) return;
+            handleOpenDropdown('games', ['1', '2', '3'], setNumberOfGames);
+          }}
           activeOpacity={0.8}
         >
           <Text style={styles.dropdownValueText}>{numberOfGames}</Text>
@@ -1249,7 +1337,13 @@ const CreateTournamentScreen = ({ navigation, route }) => {
 
         {/* Submit Button */}
         <AuthButton
-          title={isEditing ? 'SAVE CHANGES' : 'CREATE TOURNAMENT'}
+          title={
+            isEditing && challengeLocked
+              ? 'BACK'
+              : isEditing
+                ? 'SAVE CHANGES'
+                : 'CREATE TOURNAMENT'
+          }
           onPress={handleCreateTournament}
           loading={submitting}
           style={{ marginTop: hp(3), marginBottom: hp(6) }}
@@ -1276,7 +1370,11 @@ const CreateTournamentScreen = ({ navigation, route }) => {
                   ? 'Select Golf Club'
                   : activeDropdown === 'state'
                     ? 'Select State'
-                    : 'Select Option'}
+                    : activeDropdown === 'teamSize'
+                      ? 'Select Team Size'
+                      : activeDropdown === 'games'
+                        ? 'Number Of Games'
+                        : 'Select Option'}
             </Text>
 
             {['country', 'golfClub', 'state'].includes(activeDropdown) && (

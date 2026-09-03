@@ -19,6 +19,13 @@ import { COLORS } from '../../theme/colors';
 import { FONTS } from '../../theme/fonts';
 import { wp, hp, fontSize, moderateScale } from '../../utils/responsive';
 import { getPlayerGameHistoryApi } from '../../services/playerService';
+import { getStartGameReadinessApi } from '../../services/playService';
+import {
+  classifyTournamentPlay,
+  groupGameHistoryByTournament,
+  isChallengePlayMode,
+  unwrapReadiness,
+} from '../../utils/playProgress';
 
 const homescreenBg = require('../../assets/Images/homescreen_bg.jpg');
 const trophyImg = require('../../assets/Images/ trophy.png');
@@ -42,14 +49,45 @@ const TournamentHistoryScreen = ({ navigation }) => {
       setLoading(true);
       const res = await getPlayerGameHistoryApi();
       const list = res?.history || res?.data?.history || res?.data || (Array.isArray(res) ? res : []);
+      const rows = Array.isArray(list) ? list : [];
+
+      const readinessById = new Map();
+      const ids = [
+        ...new Set(
+          rows
+            .map((h) => String(h.tournamentId || h.tournament?.id || h.tournament?._id || ''))
+            .filter((id) => id && id.includes('-')),
+        ),
+      ];
+      await Promise.all(
+        ids.map((id) =>
+          getStartGameReadinessApi(id)
+            .then((ready) => readinessById.set(id, unwrapReadiness(ready)))
+            .catch(() => readinessById.set(id, null)),
+        ),
+      );
+
+      const completedRows = rows.filter((h) => {
+        const hid = String(h.tournamentId || h.tournament?.id || h.tournament?._id || '');
+        const play = classifyTournamentPlay(
+          { id: hid, numberOfGames: h.numberOfGames || h.tournament?.numberOfGames },
+          readinessById.get(hid),
+        );
+        return play.isCompleted;
+      });
+
       setHistory(
-        (Array.isArray(list) ? list : []).map((h, idx) => ({
-          id: h.sessionId || h.id || `h-${idx}`,
-          tournamentName: h.tournamentName || h.golfCourseName || 'Completed Round',
-          courseName: h.golfCourseName && h.golfCourseName !== h.tournamentName ? h.golfCourseName : '',
-          date: h.completedAt ? formatDisplayDate(h.completedAt) : '',
-          score: h.score ?? '—',
-          parDiff: h.gameNumber != null ? `Game ${h.gameNumber}` : '',
+        groupGameHistoryByTournament(completedRows).map((group, idx) => ({
+          ...group,
+          id: group.tournamentId,
+          tournamentName: group.title,
+          date: group.lastCompletedAt ? formatDisplayDate(group.lastCompletedAt) : '',
+          score: null,
+          parDiff: group.games.length === 1 ? '1 game' : `${group.games.length} games`,
+          isChallenge: isChallengePlayMode(
+            group.playMode,
+            readinessById.get(group.tournamentId)?.playMode,
+          ),
           image: HISTORY_IMAGES[idx % HISTORY_IMAGES.length],
         })),
       );
@@ -87,7 +125,9 @@ const TournamentHistoryScreen = ({ navigation }) => {
       {/* Title Container */}
       <View style={styles.titleContainer}>
         <Text style={styles.mainTitle}>Tournament History</Text>
-        <Text style={styles.subtitle}>{history.length} rounds played</Text>
+        <Text style={styles.subtitle}>
+          {history.length} {history.length === 1 ? 'tournament' : 'tournaments'}
+        </Text>
       </View>
 
       {/* Scrollable List */}
@@ -102,13 +142,54 @@ const TournamentHistoryScreen = ({ navigation }) => {
           <Text style={styles.emptyText}>No completed rounds yet.</Text>
         ) : (
           history.map((item) => (
-            <TouchableOpacity key={item.id} style={styles.historyCard} activeOpacity={0.85}>
+            <TouchableOpacity
+              key={item.id}
+              style={styles.historyCard}
+              activeOpacity={0.85}
+              onPress={() => {
+                if (!item.tournamentId) return;
+                navigation.navigate('Leaderboard', {
+                  tournament: {
+                    id: item.tournamentId,
+                    name: item.tournamentName || item.title,
+                    title: item.tournamentName || item.title,
+                    playMode: item.playMode,
+                    numberOfGames: item.games?.length || 1,
+                  },
+                  playMode: String(item.playMode || '').toLowerCase().includes('challenge')
+                    ? 'challenge'
+                    : 'practice',
+                  gameNumber: item.latestGameNumber || item.games?.[0]?.gameNumber || 1,
+                });
+              }}
+            >
               <Image source={item.image} style={styles.courseAvatar} />
 
               <View style={styles.infoContainer}>
-                <Text style={styles.tournamentName} numberOfLines={1}>
-                  {item.tournamentName}
-                </Text>
+                <View style={styles.nameRow}>
+                  <Text style={styles.tournamentName} numberOfLines={1}>
+                    {item.tournamentName}
+                  </Text>
+                  <View
+                    style={[
+                      styles.modeBadge,
+                      item.isChallenge
+                        ? styles.modeBadgeChallenge
+                        : styles.modeBadgePractice,
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.modeBadgeText,
+                        item.isChallenge
+                          ? styles.modeBadgeTextChallenge
+                          : styles.modeBadgeTextPractice,
+                      ]}
+                    >
+                      {item.isChallenge ? 'Challenge' : 'Practice'}
+                    </Text>
+                  </View>
+                </View>
                 {item.courseName ? (
                   <Text style={styles.courseName} numberOfLines={1}>
                     {item.courseName}
@@ -121,7 +202,6 @@ const TournamentHistoryScreen = ({ navigation }) => {
               </View>
 
               <View style={styles.scoreContainer}>
-                <Text style={styles.scoreText}>{item.score}</Text>
                 <Text style={styles.parDiffText}>{item.parDiff}</Text>
               </View>
             </TouchableOpacity>
@@ -202,11 +282,45 @@ const styles = StyleSheet.create({
   },
   infoContainer: {
     flex: 1,
+    marginRight: wp(2),
+  },
+  nameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: wp(1.5),
   },
   tournamentName: {
     fontFamily: FONTS.bold,
     fontSize: fontSize(14),
     color: '#093A24',
+    flexShrink: 1,
+  },
+  modeBadge: {
+    borderRadius: moderateScale(20),
+    paddingHorizontal: wp(2.2),
+    paddingVertical: hp(0.25),
+    borderWidth: 1.5,
+    flexShrink: 0,
+  },
+  modeBadgePractice: {
+    backgroundColor: '#093A24',
+    borderColor: 'rgba(255, 255, 255, 0.9)',
+  },
+  modeBadgeChallenge: {
+    backgroundColor: '#093A24',
+    borderColor: '#BCFF00',
+  },
+  modeBadgeText: {
+    fontFamily: FONTS.bold,
+    fontSize: fontSize(9),
+    letterSpacing: 0.5,
+    textTransform: 'uppercase',
+  },
+  modeBadgeTextPractice: {
+    color: '#FFFFFF',
+  },
+  modeBadgeTextChallenge: {
+    color: '#BCFF00',
   },
   courseName: {
     fontFamily: FONTS.medium,

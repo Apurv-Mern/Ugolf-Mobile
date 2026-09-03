@@ -340,6 +340,7 @@ import {
   startGameApi,
   getClubRulesApi,
 } from '../../services/playService';
+import { isChallengeLocked } from '../../utils/playProgress';
 
 // ============================================================
 // HELPERS
@@ -391,20 +392,40 @@ const GameRulesScreen = ({ navigation, route }) => {
   // HARDWARE BACK HANDLING
   // ==========================================================
 
+  const handleBackPress = React.useCallback(() => {
+    const tournamentParam = route?.params?.tournament;
+    const playMode = String(route?.params?.playMode || tournamentParam?.playMode || '').toUpperCase();
+    const isChallenge = playMode.includes('CHALLENGE');
+    const challengeLocked = !!tournamentParam?.challengeLocked || !!route?.params?.challengeLocked || isChallengeLocked(tournamentParam);
+
+    if (isChallenge && challengeLocked) {
+      navigation.reset({
+        index: 0,
+        routes: [{ name: 'MainApp' }],
+      });
+      return true;
+    }
+
+    if (navigation.canGoBack()) {
+      navigation.goBack();
+    } else {
+      navigation.reset({
+        index: 0,
+        routes: [{ name: 'MainApp' }],
+      });
+    }
+    return true;
+  }, [navigation, route?.params]);
+
   useFocusEffect(
     React.useCallback(() => {
-      const onBackPress = () => {
-        navigation.goBack();
-        return true;
-      };
-
       const subscription = BackHandler.addEventListener(
         'hardwareBackPress',
-        onBackPress,
+        handleBackPress,
       );
 
       return () => subscription.remove();
-    }, [navigation]),
+    }, [handleBackPress]),
   );
 
   // ==========================================================
@@ -415,7 +436,7 @@ const GameRulesScreen = ({ navigation, route }) => {
     const tournamentParam = route?.params?.tournament;
     const tournamentId = tournamentParam?.id || tournamentParam?._id;
 
-    const gameNumber =
+    let gameNumber =
       Number(
         route?.params?.gameNumber ??
         (route?.params?.selectedGameIndex != null
@@ -442,6 +463,14 @@ const GameRulesScreen = ({ navigation, route }) => {
           const hasActiveSession = Boolean(
             readiness?.activeSession || readiness?.activeSessionId,
           );
+
+          const completedGames = readiness?.completedGameNumbers || [];
+          if (
+            completedGames.includes(gameNumber) &&
+            readiness?.nextGameNumber != null
+          ) {
+            gameNumber = Number(readiness.nextGameNumber) || gameNumber;
+          }
 
           const isReady = readiness?.ready ?? readiness?.isReady;
 
@@ -732,7 +761,7 @@ const GameRulesScreen = ({ navigation, route }) => {
       <View style={styles.headerRow}>
         <TouchableOpacity
           style={styles.backButtonCircle}
-          onPress={() => navigation.goBack()}
+          onPress={handleBackPress}
           activeOpacity={0.7}
         >
           <AuthIcon

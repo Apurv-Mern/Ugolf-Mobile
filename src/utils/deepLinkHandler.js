@@ -1,6 +1,6 @@
 import { Linking } from 'react-native';
 import { navigate } from '../navigation/RootNavigator';
-import { getTournamentByIdApi } from '../services/homeService';
+import { getTournamentByIdApi, getTournamentsApi } from '../services/homeService';
 
 /**
  * Extracts tournament ID from a URL string or notification data object.
@@ -64,10 +64,21 @@ export const processDeepLink = async (urlOrData, navigationOverride = null) => {
       console.log('[DeepLink] Direct ID fetch failed, searching tournaments list by joinToken...');
     }
 
+    const [joinableRes, invitedRes, mineRes] = await Promise.all([
+      getTournamentsApi({ page: 1, limit: 50, scope: 'joinable' }).catch(() => null),
+      getTournamentsApi({ page: 1, limit: 50, scope: 'invited' }).catch(() => null),
+      getTournamentsApi({ page: 1, limit: 50, scope: 'mine' }).catch(() => null),
+    ]);
+    const invitedList =
+      invitedRes?.tournaments || invitedRes?.data?.tournaments || (Array.isArray(invitedRes) ? invitedRes : []);
+    const mineList =
+      mineRes?.tournaments || mineRes?.data?.tournaments || (Array.isArray(mineRes) ? mineRes : []);
+
     // If direct ID fetch failed, search candidate tournaments for matching joinToken or ID
     if (!tournament || (!tournament.id && !tournament._id)) {
-      const listRes = await getTournamentsApi({ page: 1, limit: 50 }).catch(() => null);
-      const list = listRes?.tournaments || listRes?.data?.tournaments || (Array.isArray(listRes) ? listRes : []);
+      const list = [joinableRes, invitedRes, mineRes].flatMap((listRes) =>
+        listRes?.tournaments || listRes?.data?.tournaments || (Array.isArray(listRes) ? listRes : []),
+      );
       const matched = list.find(
         (t) =>
           String(t.joinToken) === String(targetIdOrToken) ||
@@ -85,6 +96,13 @@ export const processDeepLink = async (urlOrData, navigationOverride = null) => {
       tournament?.title ||
       (typeof urlOrData === 'object' ? urlOrData?.tournamentName : 'Tournament');
 
+    const isInvited = (Array.isArray(invitedList) ? invitedList : []).some(
+      (t) => String(t.id || t._id) === String(tournamentId),
+    );
+    const isMine = (Array.isArray(mineList) ? mineList : []).some(
+      (t) => String(t.id || t._id) === String(tournamentId),
+    );
+
     const navParams = {
       tournament: {
         ...(tournament || {}),
@@ -93,13 +111,14 @@ export const processDeepLink = async (urlOrData, navigationOverride = null) => {
         title: tournamentName,
       },
       playMode,
-      isCreator: false,
+      isCreator: isMine && !isInvited,
     };
 
+    const screen = isInvited || !isMine ? 'SelectGame' : 'ConfigureGames';
     if (navigationOverride && typeof navigationOverride.navigate === 'function') {
-      navigationOverride.navigate('ConfigureGames', navParams);
+      navigationOverride.navigate(screen, navParams);
     } else {
-      navigate('ConfigureGames', navParams);
+      navigate(screen, navParams);
     }
     return true;
   } catch (err) {
@@ -117,9 +136,9 @@ export const processDeepLink = async (urlOrData, navigationOverride = null) => {
     };
 
     if (navigationOverride && typeof navigationOverride.navigate === 'function') {
-      navigationOverride.navigate('ConfigureGames', navParams);
+      navigationOverride.navigate('SelectGame', navParams);
     } else {
-      navigate('ConfigureGames', navParams);
+      navigate('SelectGame', navParams);
     }
     return true;
   }

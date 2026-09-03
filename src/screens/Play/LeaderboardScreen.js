@@ -429,6 +429,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
+import { useSelector } from 'react-redux';
 
 import AuthButton from '../../components/common/AuthButton';
 import AuthIcon from '../../components/common/AuthIcon';
@@ -441,12 +442,18 @@ const tournamentBg = require('../../assets/Images/tournament_bg.jpg');
 const isUuid = (id) => typeof id === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
 
 const LeaderboardScreen = ({ navigation, route }) => {
+  const currentUser = useSelector((state) => state.auth?.user);
+  const currentUserId = currentUser?.id || currentUser?._id || currentUser?.userId;
   const tournament = route?.params?.tournament;
   const tournamentId = tournament?.id || tournament?._id;
   const playMode = route?.params?.playMode || tournament?.playMode || 'practice';
-  const gameNumber = route?.params?.gameNumber || 1;
 
+  const [selectedGame, setSelectedGame] = useState(Number(route?.params?.gameNumber) || 1);
+  const [numberOfGames, setNumberOfGames] = useState(
+    Math.max(1, Number(tournament?.numberOfGames) || 1),
+  );
   const [entries, setEntries] = useState([]);
+  const [challengeTeams, setChallengeTeams] = useState([]);
   const [meta, setMeta] = useState({
     tournamentName: tournament?.name || tournament?.title || 'Tournament',
     playMode,
@@ -469,29 +476,50 @@ const LeaderboardScreen = ({ navigation, route }) => {
     }
     try {
       setLoading(true);
-      const res = await getTournamentLeaderboardApi(tournamentId);
-      setMeta({
-        tournamentName: res?.tournamentName || tournament?.name || tournament?.title || 'Tournament',
-        playMode: res?.playMode || playMode,
+      const res = await getTournamentLeaderboardApi(tournamentId, {
+        gameNumber: selectedGame,
+        view: 'game',
       });
-      const list = res?.entries || res?.data?.entries || [];
+      const data = res?.data || res;
+      const gamesCount = Number(data?.numberOfGames) || Number(tournament?.numberOfGames) || 1;
+      setNumberOfGames(Math.max(1, gamesCount));
+      setMeta({
+        tournamentName: data?.tournamentName || tournament?.name || tournament?.title || 'Tournament',
+        playMode: data?.playMode || playMode,
+      });
+      const list = data?.entries || res?.entries || [];
+      const practicePb =
+        data?.practice?.personalBest ??
+        data?.practice?.lastTournamentBest ??
+        null;
       setEntries(
-        (Array.isArray(list) ? list : []).map((e, idx) => ({
-          rank: e.rank || idx + 1,
-          name: e.playerName || e.name || 'Player',
-          roundScore: e.score ?? 0,
-          personalBest: e.currentHole != null ? `H${e.currentHole}` : e.status || '—',
-          isYou: !!e.isYou || idx === 0,
-          avatarUrl: e.avatarUrl || e.avatar || e.image || null,
-        })),
+        (Array.isArray(list) ? list : []).map((e, idx) => {
+          const playerId = e.playerUserId || e.userId || e.id;
+          const isYou = Boolean(
+            currentUserId && playerId && String(playerId) === String(currentUserId),
+          );
+          const entryPb = e.personalBest ?? e.lastTournamentBest ?? e.lastScore;
+          const pb = entryPb ?? (isYou ? practicePb : null);
+          return {
+            rank: e.rank || idx + 1,
+            name: e.playerName || e.name || 'Player',
+            roundScore: e.score ?? 0,
+            personalBest: pb != null && pb !== '' ? String(pb) : '—',
+            isYou,
+            avatarUrl: e.avatarUrl || e.avatar || e.image || null,
+          };
+        }),
       );
+      const teams = data?.challenge?.teams || res?.challenge?.teams || [];
+      setChallengeTeams(Array.isArray(teams) ? teams : []);
     } catch (err) {
       console.log('Leaderboard load error:', err);
       setEntries([]);
+      setChallengeTeams([]);
     } finally {
       setLoading(false);
     }
-  }, [tournamentId, playMode, tournament]);
+  }, [tournamentId, playMode, tournament, selectedGame, currentUserId]);
 
   useFocusEffect(
     useCallback(() => {
@@ -508,9 +536,8 @@ const LeaderboardScreen = ({ navigation, route }) => {
     });
   };
 
-  const modeLabel = String(meta.playMode || playMode).toLowerCase().includes('challenge')
-    ? 'Challenge'
-    : 'Practice';
+  const isChallenge = String(meta.playMode || playMode).toLowerCase().includes('challenge');
+  const modeLabel = isChallenge ? 'Challenge' : 'Practice';
 
   return (
     <SafeAreaView style={styles.container} edges={['bottom']}>
@@ -525,62 +552,126 @@ const LeaderboardScreen = ({ navigation, route }) => {
         <ImageBackground source={tournamentBg} style={styles.header} resizeMode="cover">
           <View style={styles.headerOverlay} />
           <Text style={styles.bannerTitle}>Leaderboard</Text>
-          <Text style={styles.bannerSubtitle}>
-            Game {gameNumber} · {modeLabel} · {meta.tournamentName}
-          </Text>
+          <View style={styles.subPillBadge}>
+            <Text style={styles.bannerSubtitle} numberOfLines={1} ellipsizeMode="tail">
+              Game {selectedGame} · {modeLabel} · {meta.tournamentName}
+            </Text>
+          </View>
         </ImageBackground>
 
         <View style={styles.contentContainer}>
+          {numberOfGames > 1 ? (
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.gameTabs}
+            >
+              {Array.from({ length: numberOfGames }, (_, i) => i + 1).map((n) => {
+                const active = selectedGame === n;
+                return (
+                  <TouchableOpacity
+                    key={n}
+                    style={[styles.gameTab, active && styles.gameTabActive]}
+                    onPress={() => setSelectedGame(n)}
+                    activeOpacity={0.85}
+                  >
+                    <Text style={[styles.gameTabText, active && styles.gameTabTextActive]}>
+                      Game {n}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+          ) : null}
+
           {loading ? (
             <ActivityIndicator color="#093A24" style={{ marginTop: hp(4) }} />
           ) : (
             <>
-              {/* Column Table Headers matching Figma */}
-              <View style={styles.tableHeaderRow}>
-                <Text style={[styles.colHeader, { flex: 2 }]}>Player (Ability Rank)</Text>
-                <Text style={[styles.colHeader, { flex: 1, textAlign: 'center' }]}>This Round</Text>
-                <Text style={[styles.colHeader, { flex: 1.2, textAlign: 'center' }]}>Personal Best (Last)</Text>
-              </View>
-
-              {entries.length === 0 ? (
-                <Text style={styles.emptyText}>
-                  No leaderboard entries yet.
-                </Text>
-              ) : (
-                entries.map((item) => (
-                  <View
-                    key={`${item.rank}-${item.name}`}
-                    style={[styles.playerCard, item.isYou && styles.playerCardYou]}
-                  >
-                    <View style={styles.playerInfoCol}>
-                      <Text style={styles.rankNum}>{item.rank}</Text>
-
-                      {item.avatarUrl ? (
-                        <Image source={{ uri: item.avatarUrl }} style={styles.playerAvatar} />
-                      ) : (
-                        <View style={styles.avatarPlaceholder}>
-                          <AuthIcon name="user" size={moderateScale(18)} color="#093A24" />
-                        </View>
-                      )}
-
-                      <Text style={styles.playerName} numberOfLines={1}>
-                        {item.name}
-                      </Text>
-                    </View>
-
-                    <Text style={styles.roundScoreText}>{item.roundScore}</Text>
-                    <Text style={styles.pbScoreText}>{item.personalBest}</Text>
+              {isChallenge ? (
+                <>
+                  <View style={styles.tableHeaderRow}>
+                    <Text style={[styles.colHeader, { flex: 2 }]}>Team / Player</Text>
+                    <Text style={[styles.colHeader, { flex: 1, textAlign: 'center' }]}>Score</Text>
                   </View>
-                ))
-              )}
+                  {challengeTeams.length === 0 ? (
+                    <Text style={styles.emptyText}>No leaderboard entries yet.</Text>
+                  ) : (
+                    challengeTeams.map((team) => (
+                      <View key={team.teamId || team.teamName} style={styles.teamBoardCard}>
+                        <View style={styles.teamBoardHeader}>
+                          <Text style={styles.teamBoardRank}>#{team.rank}</Text>
+                          <Text style={styles.teamBoardName} numberOfLines={1}>
+                            {team.teamName || 'Team'}
+                          </Text>
+                          <Text style={styles.teamBoardTotal}>{team.totalScore ?? 0}</Text>
+                        </View>
+                        {(team.players || []).map((player, idx) => {
+                          const playerId = player.playerUserId || player.userId || player.id;
+                          return (
+                            <View
+                              key={`${playerId || player.playerName || idx}`}
+                              style={styles.teamPlayerRow}
+                            >
+                              <Text style={styles.teamPlayerName} numberOfLines={1}>
+                                {player.playerName || player.name || 'Player'}
+                              </Text>
+                              <Text style={styles.teamPlayerScore}>{player.score ?? 0}</Text>
+                            </View>
+                          );
+                        })}
+                      </View>
+                    ))
+                  )}
+                </>
+              ) : (
+                <>
+                  <View style={styles.tableHeaderRow}>
+                    <Text style={[styles.colHeader, { flex: 2 }]}>Player (Ability Rank)</Text>
+                    <Text style={[styles.colHeader, { flex: 1, textAlign: 'center' }]}>This Round</Text>
+                    <Text style={[styles.colHeader, { flex: 1.2, textAlign: 'center' }]}>Personal Best (Last)</Text>
+                  </View>
 
-              {/* Info Box matching Figma */}
-              <View style={styles.infoBox}>
-                <AuthIcon name="info" size={moderateScale(16)} color="#093A24" style={{ marginTop: 2 }} />
-                <Text style={styles.infoBoxText}>
-                  The "Personal Best" column shows your last score for this course and segment. If it's your first time, the comparison will be empty.
-                </Text>
-              </View>
+                  {entries.length === 0 ? (
+                    <Text style={styles.emptyText}>
+                      No leaderboard entries yet.
+                    </Text>
+                  ) : (
+                    entries.map((item) => (
+                      <View
+                        key={`${item.rank}-${item.name}`}
+                        style={[styles.playerCard, item.isYou && styles.playerCardYou]}
+                      >
+                        <View style={styles.playerInfoCol}>
+                          <Text style={styles.rankNum}>{item.rank}</Text>
+
+                          {item.avatarUrl ? (
+                            <Image source={{ uri: item.avatarUrl }} style={styles.playerAvatar} />
+                          ) : (
+                            <View style={styles.avatarPlaceholder}>
+                              <AuthIcon name="user" size={moderateScale(18)} color="#093A24" />
+                            </View>
+                          )}
+
+                          <Text style={styles.playerName} numberOfLines={1}>
+                            {item.name}
+                          </Text>
+                        </View>
+
+                        <Text style={styles.roundScoreText}>{item.roundScore}</Text>
+                        <Text style={styles.pbScoreText}>{item.personalBest}</Text>
+                      </View>
+                    ))
+                  )}
+
+                  <View style={styles.infoBox}>
+                    <AuthIcon name="info" size={moderateScale(16)} color="#093A24" style={{ marginTop: 2 }} />
+                    <Text style={styles.infoBoxText}>
+                      The "Personal Best" column shows your last score for this course and segment. If it's your first time, the comparison will be empty.
+                    </Text>
+                  </View>
+                </>
+              )}
             </>
           )}
 
@@ -629,17 +720,53 @@ const styles = StyleSheet.create({
     fontSize: fontSize(28),
     color: COLORS.white,
   },
+  subPillBadge: {
+    alignSelf: 'flex-start',
+    backgroundColor: 'rgba(5, 25, 16, 0.70)',
+    borderRadius: moderateScale(10),
+    paddingHorizontal: wp(3),
+    paddingVertical: hp(0.5),
+    marginTop: hp(0.8),
+    borderWidth: 1,
+    borderColor: 'rgba(188, 255, 0, 0.35)',
+  },
   bannerSubtitle: {
-    fontFamily: FONTS.medium,
-    fontSize: fontSize(13),
-    color: 'rgba(255, 255, 255, 0.85)',
-    marginTop: hp(0.3),
+    fontFamily: FONTS.bold,
+    fontSize: fontSize(12),
+    color: '#FFFFFF',
+    textShadowColor: 'rgba(0, 0, 0, 0.9)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
   },
 
   // Content
   contentContainer: {
     paddingHorizontal: wp(5),
     paddingTop: hp(2.5),
+  },
+  gameTabs: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: wp(2),
+    marginBottom: hp(2),
+    paddingRight: wp(2),
+  },
+  gameTab: {
+    borderRadius: moderateScale(20),
+    paddingHorizontal: wp(4),
+    paddingVertical: hp(0.8),
+    backgroundColor: '#EDF2F7',
+  },
+  gameTabActive: {
+    backgroundColor: '#0E3B2E',
+  },
+  gameTabText: {
+    fontFamily: FONTS.bold,
+    fontSize: fontSize(12.5),
+    color: '#093A24',
+  },
+  gameTabTextActive: {
+    color: '#BCFF00',
   },
 
   // Table Headers
@@ -683,6 +810,56 @@ const styles = StyleSheet.create({
   playerCardYou: {
     borderColor: '#BCFF00',
     borderWidth: 2,
+  },
+  teamBoardCard: {
+    backgroundColor: COLORS.white,
+    borderWidth: 1.5,
+    borderColor: '#E2E8F0',
+    borderRadius: moderateScale(22),
+    paddingHorizontal: wp(4),
+    paddingVertical: hp(1.4),
+    marginBottom: hp(1.5),
+  },
+  teamBoardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: hp(1),
+  },
+  teamBoardRank: {
+    fontFamily: FONTS.bold,
+    fontSize: fontSize(14),
+    color: '#093A24',
+    width: wp(8),
+  },
+  teamBoardName: {
+    flex: 1,
+    fontFamily: FONTS.bold,
+    fontSize: fontSize(15),
+    color: '#093A24',
+  },
+  teamBoardTotal: {
+    fontFamily: FONTS.bold,
+    fontSize: fontSize(16),
+    color: '#093A24',
+  },
+  teamPlayerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: hp(0.7),
+    borderTopWidth: 1,
+    borderTopColor: '#EDF2F7',
+  },
+  teamPlayerName: {
+    flex: 1,
+    fontFamily: FONTS.medium,
+    fontSize: fontSize(13),
+    color: '#4A5568',
+  },
+  teamPlayerScore: {
+    fontFamily: FONTS.bold,
+    fontSize: fontSize(14),
+    color: '#093A24',
   },
   playerInfoCol: {
     flex: 2,

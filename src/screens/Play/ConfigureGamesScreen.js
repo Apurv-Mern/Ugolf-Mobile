@@ -23,8 +23,9 @@ import AuthIcon from '../../components/common/AuthIcon';
 import { COLORS } from '../../theme/colors';
 import { FONTS } from '../../theme/fonts';
 import { wp, hp, fontSize, moderateScale } from '../../utils/responsive';
-import { getConfigureGamesApi, saveConfigureGamesApi, getCoursesByClubApi } from '../../services/homeService';
+import { getConfigureGamesApi, saveConfigureGamesApi, getCoursesByClubApi, getTournamentByIdApi } from '../../services/homeService';
 import { getTournamentTeamsApi } from '../../services/teamService';
+import { isChallengeLocked } from '../../utils/playProgress';
 
 const tournamentBg = require('../../assets/Images/tournament_bg.jpg');
 const isUuid = (id) => typeof id === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
@@ -51,6 +52,10 @@ const ConfigureGamesScreen = ({ navigation, route }) => {
 
   // Selected game for invited player
   const [selectedGameIndex, setSelectedGameIndex] = useState(0);
+  const [challengeLocked, setChallengeLocked] = useState(
+    !!tournament?.challengeLocked,
+  );
+  const [gameStarted, setGameStarted] = useState(!!tournament?.gameStarted);
 
   // Dropdown modal state
   const [modal, setModal] = useState({
@@ -74,6 +79,12 @@ const ConfigureGamesScreen = ({ navigation, route }) => {
 
   const statusUpper = String(tournament?.status || configData?.status || '').toUpperCase();
   const isStarted =
+    challengeLocked === true ||
+    tournament?.challengeLocked === true ||
+    configData?.challengeLocked === true ||
+    gameStarted === true ||
+    tournament?.gameStarted === true ||
+    configData?.gameStarted === true ||
     tournament?.isStarted === true ||
     tournament?.hasStarted === true ||
     tournament?.isInProgress === true ||
@@ -178,6 +189,25 @@ const ConfigureGamesScreen = ({ navigation, route }) => {
 
       const fullData = { ...data, availableCourses };
       setConfigData(fullData);
+
+      if (tournamentId && isUuid(String(tournamentId))) {
+        try {
+          const tRes = await getTournamentTeamsApi(tournamentId);
+          if (tRes?.challengeLocked === true || tRes?.data?.challengeLocked === true || isChallengeLocked(tournament, tRes)) {
+            setChallengeLocked(true);
+          }
+        } catch (lockErr) {
+          console.log('Challenge lock check note:', lockErr);
+        }
+        try {
+          const tDetail = await getTournamentByIdApi(tournamentId);
+          const fullT = tDetail?.tournament || tDetail?.data?.tournament || tDetail?.data || tDetail;
+          if (fullT?.challengeLocked === true) setChallengeLocked(true);
+          if (fullT?.gameStarted === true) setGameStarted(true);
+        } catch (startedErr) {
+          console.log('Tournament started check note:', startedErr);
+        }
+      }
 
       const numGames =
         fullData?.numberOfGames ||
@@ -399,6 +429,18 @@ const ConfigureGamesScreen = ({ navigation, route }) => {
           }
           return;
         }
+      }
+
+      if (challengeLocked || isStarted) {
+        navigation.navigate('SelectGame', {
+          ...route?.params,
+          tournament,
+          selectedTeam,
+          selectedGameIndex,
+          gameNumber: (selectedGameIndex != null ? Number(selectedGameIndex) : 0) + 1,
+          playMode: route?.params?.playMode || tournament?.playMode || 'challenge',
+        });
+        return;
       }
 
       navigation.navigate('SelectTeam', {
