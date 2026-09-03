@@ -2235,6 +2235,13 @@ const TAB_ITEMS = [
   { iconName: 'user', label: 'Profile' },
 ];
 
+const truncateText = (text, maxLength = 25) => {
+  if (!text || typeof text !== 'string') return '';
+  const trimmed = text.trim();
+  if (trimmed.length <= maxLength) return trimmed;
+  return `${trimmed.slice(0, maxLength).trim()}...`;
+};
+
 const HomeScreen = ({ navigation }) => {
   const [activeTab, setActiveTab] = useState(0);
   const [hideTabBar, setHideTabBar] = useState(false);
@@ -2864,7 +2871,7 @@ const HomeScreen = ({ navigation }) => {
             {upcomingTournaments.length > 0 ? (
               <TouchableOpacity
                 onPress={() =>
-                  navigation.navigate('SelectTournament', { showAllModes: true })
+                  navigation.navigate('SelectTournament', { showAllModes: true, filterStatus: 'UPCOMING' })
                 }
               >
                 <Text style={activeStyles.seeAll}>See all</Text>
@@ -2968,14 +2975,14 @@ const HomeScreen = ({ navigation }) => {
 
                 {/* Overlay info */}
                 <View style={activeStyles.tournamentInfo}>
-                  <Text style={activeStyles.tournamentTitle} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>{item.title}</Text>
+                  <Text style={activeStyles.tournamentTitle} numberOfLines={1}>{item.title}</Text>
                   <View style={activeStyles.tournamentMeta}>
                     <View style={activeStyles.metaChip}>
                       <Text style={activeStyles.tournamentMetaText}>📅 {item.date}</Text>
                     </View>
                     {item.location ? (
-                      <View style={[activeStyles.metaChip, { flexShrink: 1, maxWidth: wp(50) }]}>
-                        <Text style={activeStyles.tournamentMetaText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>📍 {item.location}</Text>
+                      <View style={[activeStyles.metaChip, { flexShrink: 1, maxWidth: wp(60) }]}>
+                        <Text style={activeStyles.tournamentMetaText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>📍 {item.location}</Text>
                       </View>
                     ) : null}
                     {item.joined && item.joined !== '—' && item.joined !== 0 ? (

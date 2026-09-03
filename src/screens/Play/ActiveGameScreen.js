@@ -1526,6 +1526,14 @@
 
 // export default ActiveGameScreen;
 
+//   },
+// });
+
+// export default ActiveGameScreen;
+
+
+
+
 
 
 
@@ -1733,18 +1741,27 @@ const ActiveGameScreen = ({ navigation, route }) => {
         playData.can_go_back ??
         playData.canStepBack;
 
-      if (backendCanGoBack !== undefined && backendCanGoBack !== null) {
-        setCanGoBack(!!backendCanGoBack);
+      const isSubQuestionScreen = resolvedMode === 'YES_ONLY' || qList.length > 1;
+
+      const startHole = playData.holeStart ?? tournament?.holeStart ?? 1;
+      const currentHoleVal = playData.currentHole ?? playData.holeNumber ?? holeNumber ?? 1;
+      const currentShotVal = playData.currentShot ?? playData.shotNumber ?? shotNumber ?? 1;
+      const currentOriginVal = playData.currentOrigin || originLocation || 'TEE';
+
+      const isAbsoluteFirstStep =
+        !isSubQuestionScreen &&
+        currentHoleVal <= startHole &&
+        currentShotVal <= 1 &&
+        (currentOriginVal === 'TEE' || currentOriginVal === 'TEE_SHOT');
+
+      if (backendCanGoBack === false) {
+        setCanGoBack(false);
+      } else if (isAbsoluteFirstStep) {
+        setCanGoBack(false);
+      } else if (backendCanGoBack === true) {
+        setCanGoBack(true);
       } else {
-        const startHole = playData.holeStart ?? tournament?.holeStart ?? 1;
-        const currentHoleVal = hole ?? holeNumber;
-        const currentShotVal = shot ?? shotNumber;
-        const currentOriginVal = playData.currentOrigin || originLocation;
-        const isFirstStep =
-          (currentHoleVal == null || currentHoleVal <= startHole) &&
-          (currentShotVal == null || currentShotVal <= 1) &&
-          (!currentOriginVal || currentOriginVal === 'TEE');
-        setCanGoBack(!isFirstStep);
+        setCanGoBack(true);
       }
 
       if (screen === 'FINISHED' || playData.finished || playData.isFinished || playData.status === 'FINISHED') {
@@ -1815,7 +1832,7 @@ const ActiveGameScreen = ({ navigation, route }) => {
         const next = data?.nextGameNumber != null ? Number(data.nextGameNumber) : null;
         setNextGameNumber(Number.isFinite(next) ? next : null);
       })
-      .catch(() => {});
+      .catch(() => { });
 
     return () => {
       cancelled = true;
@@ -1873,7 +1890,7 @@ const ActiveGameScreen = ({ navigation, route }) => {
       String(playModeParam || playMeta.playMode || 'practice').toLowerCase() === 'challenge'
         ? 'challenge'
         : 'practice';
-    navigation.navigate('SelectGame', {
+    navigation.replace('SelectGame', {
       tournament,
       selectedTeam,
       players,
