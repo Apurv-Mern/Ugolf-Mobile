@@ -137,6 +137,8 @@ const HelpSupportScreen = ({ navigation }) => {
             <Text style={styles.contactCardSub}>support@ugolf.com</Text>
           </TouchableOpacity>
 
+          {/* Live Chat (Commented out for future use) */}
+          {/*
           <TouchableOpacity
             style={styles.contactCard}
             onPress={() =>
@@ -154,6 +156,7 @@ const HelpSupportScreen = ({ navigation }) => {
             <Text style={styles.contactCardTitle}>Live Chat</Text>
             <Text style={styles.contactCardSub}>Available 24/7</Text>
           </TouchableOpacity>
+          */}
         </View>
 
         {/* FAQs Section */}

@@ -278,8 +278,8 @@ const CreateTournamentScreen = ({ navigation, route }) => {
   const [teamSize, setTeamSize] = useState(
     String(
       route?.params?.teamSize ||
-        tournamentParam?.teamSize ||
-        (isChallengeMode ? '4' : '5'),
+      tournamentParam?.teamSize ||
+      (isChallengeMode ? '4' : '5'),
     ),
   );
   const [challengeLocked, setChallengeLocked] = useState(
@@ -1403,10 +1403,10 @@ const CreateTournamentScreen = ({ navigation, route }) => {
                 <TextInput
                   style={styles.modalSearchInput}
                   placeholder={`Search ${activeDropdown === 'country'
-                      ? 'country'
-                      : activeDropdown === 'golfClub'
-                        ? 'golf club'
-                        : 'state'
+                    ? 'country'
+                    : activeDropdown === 'golfClub'
+                      ? 'golf club'
+                      : 'state'
                     }...`}
                   placeholderTextColor="#A0AEC0"
                   value={dropdownSearchQuery}

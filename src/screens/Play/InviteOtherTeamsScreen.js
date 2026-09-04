@@ -44,6 +44,7 @@ const InviteOtherTeamsScreen = ({ navigation, route }) => {
   const tournamentId = tournamentParam?.id || tournamentParam?._id;
 
   const [teamsList, setTeamsList] = useState([]);
+  const [masterInvitedTeams, setMasterInvitedTeams] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(false);
   const [actionLoadingId, setActionLoadingId] = useState(null);
@@ -66,10 +67,20 @@ const InviteOtherTeamsScreen = ({ navigation, route }) => {
       const joinedTeams = tRes?.teams || tRes?.data?.teams || tRes?.data || (Array.isArray(tRes) ? tRes : []);
 
       const joinedById = {};
+      const currentInvitedOpponents = [];
       (Array.isArray(joinedTeams) ? joinedTeams : []).forEach((t) => {
-        const id = String(t.id || t._id || t.teamId);
-        joinedById[id] = t;
+        const id = String(t.id || t._id || t.teamId || '');
+        if (id) {
+          joinedById[id] = t;
+          const statusLower = String(t.status || t.inviteStatus || '').toLowerCase();
+          const isOwn = statusLower === 'your_team' || !!t.isOwnTeam || id === String(selectedTeam?.id);
+          const isInvitedOrJoined = statusLower === 'accepted' || statusLower === 'invited' || statusLower === 'joined' || statusLower === 'confirmed' || statusLower === 'pending';
+          if (!isOwn && isInvitedOrJoined) {
+            currentInvitedOpponents.push({ id, ...t });
+          }
+        }
       });
+      setMasterInvitedTeams(currentInvitedOpponents);
 
       if (Array.isArray(candidates)) {
         const formatted = candidates.map((item, idx) => {
@@ -185,10 +196,19 @@ const InviteOtherTeamsScreen = ({ navigation, route }) => {
     }
   };
 
-  const invitedOpponents = teamsList.filter(
-    (t) => !t.isOwnTeam && String(t.id) !== String(selectedTeam?.id) && t.isInvited
-  );
-  const invitedCount = invitedOpponents.length;
+  const allInvitedMap = {};
+  (Array.isArray(masterInvitedTeams) ? masterInvitedTeams : []).forEach((t) => {
+    const id = String(t.id || t._id || t.teamId || '');
+    if (id && id !== String(selectedTeam?.id)) {
+      allInvitedMap[id] = true;
+    }
+  });
+  (Array.isArray(teamsList) ? teamsList : []).forEach((t) => {
+    if (!t.isOwnTeam && String(t.id) !== String(selectedTeam?.id) && t.isInvited) {
+      allInvitedMap[String(t.id)] = true;
+    }
+  });
+  const invitedCount = Object.keys(allInvitedMap).length;
 
   const filteredTeams = teamsList.filter(
     (t) =>
@@ -198,9 +218,7 @@ const InviteOtherTeamsScreen = ({ navigation, route }) => {
       ((t.name || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
         (t.city || '').toLowerCase().includes(searchQuery.toLowerCase()))
   );
-  const hasActiveOpponentInvite = teamsList.some(
-    (t) => !t.isOwnTeam && (t.isPending || t.isAccepted),
-  );
+  const hasActiveOpponentInvite = invitedCount > 0;
 
   const handleContinue = () => {
     if (invitedCount === 0) {
@@ -299,7 +317,9 @@ const InviteOtherTeamsScreen = ({ navigation, route }) => {
             {!loading && filteredTeams.length === 0 && (
               <View style={styles.emptyStateWrap}>
                 <Text style={styles.emptyStateText}>
-                  No other teams available to challenge yet. Another captain needs to create a team first.
+                  {searchQuery.trim()
+                    ? `No teams found matching "${searchQuery.trim()}".`
+                    : 'No other teams available to challenge yet. Another captain needs to create a team first.'}
                 </Text>
               </View>
             )}
