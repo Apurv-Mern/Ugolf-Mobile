@@ -1526,6 +1526,14 @@
 
 // export default ActiveGameScreen;
 
+//   },
+// });
+
+// export default ActiveGameScreen;
+
+
+
+
 
 
 
@@ -1619,6 +1627,7 @@ const ActiveGameScreen = ({ navigation, route }) => {
   const [showGameEndModal, setShowGameEndModal] = useState(false);
   const [nextGameNumber, setNextGameNumber] = useState(null);
   const [actionLoading, setActionLoading] = useState(false);
+  const [canGoBack, setCanGoBack] = useState(false);
 
   const canCallSessionApi =
     tournamentId &&
@@ -1727,11 +1736,39 @@ const ActiveGameScreen = ({ navigation, route }) => {
         setActiveQuestionId('');
       }
 
+      const backendCanGoBack =
+        playData.canGoBack ??
+        playData.can_go_back ??
+        playData.canStepBack;
+
+      const isSubQuestionScreen = resolvedMode === 'YES_ONLY' || qList.length > 1;
+
+      const startHole = playData.holeStart ?? tournament?.holeStart ?? 1;
+      const currentHoleVal = playData.currentHole ?? playData.holeNumber ?? holeNumber ?? 1;
+      const currentShotVal = playData.currentShot ?? playData.shotNumber ?? shotNumber ?? 1;
+      const currentOriginVal = playData.currentOrigin || originLocation || 'TEE';
+
+      const isAbsoluteFirstStep =
+        !isSubQuestionScreen &&
+        currentHoleVal <= startHole &&
+        currentShotVal <= 1 &&
+        (currentOriginVal === 'TEE' || currentOriginVal === 'TEE_SHOT');
+
+      if (backendCanGoBack === false) {
+        setCanGoBack(false);
+      } else if (isAbsoluteFirstStep) {
+        setCanGoBack(false);
+      } else if (backendCanGoBack === true) {
+        setCanGoBack(true);
+      } else {
+        setCanGoBack(true);
+      }
+
       if (screen === 'FINISHED' || playData.finished || playData.isFinished || playData.status === 'FINISHED') {
         setShowGameEndModal(true);
       }
     },
-    [activeSessionId, tournament],
+    [activeSessionId, tournament, holeNumber, shotNumber, originLocation],
   );
 
   const runPlayAction = async (fn) => {
@@ -1795,7 +1832,7 @@ const ActiveGameScreen = ({ navigation, route }) => {
         const next = data?.nextGameNumber != null ? Number(data.nextGameNumber) : null;
         setNextGameNumber(Number.isFinite(next) ? next : null);
       })
-      .catch(() => {});
+      .catch(() => { });
 
     return () => {
       cancelled = true;
@@ -1826,6 +1863,7 @@ const ActiveGameScreen = ({ navigation, route }) => {
   };
 
   const handleBackStep = () => {
+    if (!canGoBack) return;
     runPlayAction(() => backSessionStepApi(tournamentId, activeSessionId));
   };
 
@@ -1852,7 +1890,7 @@ const ActiveGameScreen = ({ navigation, route }) => {
       String(playModeParam || playMeta.playMode || 'practice').toLowerCase() === 'challenge'
         ? 'challenge'
         : 'practice';
-    navigation.navigate('SelectGame', {
+    navigation.replace('SelectGame', {
       tournament,
       selectedTeam,
       players,
@@ -2106,14 +2144,16 @@ const ActiveGameScreen = ({ navigation, route }) => {
 
         {/* Bottom Actions Row: BACK ONE STEP + LEAVE */}
         <View style={styles.bottomActionsRow}>
-          <TouchableOpacity
-            style={styles.backStepBtn}
-            onPress={handleBackStep}
-            disabled={actionLoading || playScreen === 'FINISHED'}
-            activeOpacity={0.85}
-          >
-            <Text style={styles.backStepBtnText}>BACK ONE STEP</Text>
-          </TouchableOpacity>
+          {canGoBack && playScreen !== 'FINISHED' ? (
+            <TouchableOpacity
+              style={styles.backStepBtn}
+              onPress={handleBackStep}
+              disabled={actionLoading}
+              activeOpacity={0.85}
+            >
+              <Text style={styles.backStepBtnText}>BACK ONE STEP</Text>
+            </TouchableOpacity>
+          ) : null}
 
           <TouchableOpacity
             style={styles.leaveBtn}

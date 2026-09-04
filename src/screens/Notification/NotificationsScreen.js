@@ -1214,6 +1214,7 @@ import {
   clearAllNotificationsApi,
   markNotificationReadApi,
   respondToNotificationApi,
+  getUnreadNotificationsCountApi,
 } from '../../services/notificationService';
 import { processDeepLink } from '../../utils/deepLinkHandler';
 
@@ -1228,13 +1229,29 @@ const isUuid = (id) =>
     id
   );
 
+const markInviteResponded = (list, itemId, status) =>
+  list.map((i) =>
+    i.id === itemId
+      ? {
+          ...i,
+          status,
+          actionable: false,
+          isRead: true,
+          rawItem: {
+            ...(i.rawItem || {}),
+            status,
+            actionable: false,
+          },
+        }
+      : i,
+  );
+
 
 // ============================================================
 // Screen
 // ============================================================
 
 const NotificationsScreen = ({ navigation }) => {
-  const [respondedIds, setRespondedIds] = useState([]);
   const [todayList, setTodayList] = useState([]);
   const [earlierList, setEarlierList] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -1322,6 +1339,14 @@ const NotificationsScreen = ({ navigation }) => {
   };
 
 
+  const refreshUnreadCount = async () => {
+    try {
+      await getUnreadNotificationsCountApi();
+    } catch (err) {
+      console.log('Unread notifications count note:', err);
+    }
+  };
+
   // ==========================================================
   // Fetch notifications
   // ==========================================================
@@ -1386,7 +1411,7 @@ const NotificationsScreen = ({ navigation }) => {
             item.updated_at;
 
           let displayTime = 'Now';
-          let isReceivedToday = true;
+          let isReceivedToday = false;
 
           if (rawDate) {
             try {
@@ -1457,20 +1482,69 @@ const NotificationsScreen = ({ navigation }) => {
 
             type: item.type,
 
+            isReinvite: !!(
+              item.data?.reinvite ||
+              item.metadata?.reinvite ||
+              item.payload?.reinvite
+            ),
+
             rawItem: item,
           };
         });
 
-        const activeNotifications = formatted.filter(
-          (n) => !respondedIds.includes(String(n.id))
-        );
+        const latestInviteIdByKey = new Map();
+        for (const n of formatted) {
+          const type = String(n.type || '').toUpperCase();
+          if (type !== 'TOURNAMENT_TEAM_INVITE') continue;
+          const tournamentId =
+            n.rawItem?.data?.tournamentId || n.rawItem?.tournamentId;
+          const teamId = n.rawItem?.data?.teamId || n.rawItem?.teamId;
+          if (!tournamentId || !teamId) continue;
+          const key = `${tournamentId}:${teamId}`;
+          const createdAt = new Date(n.rawItem?.createdAt || 0).getTime();
+          const prev = latestInviteIdByKey.get(key);
+          if (!prev || createdAt > prev.createdAt) {
+            latestInviteIdByKey.set(key, { id: n.id, createdAt });
+          }
+        }
 
-        const activeToday = activeNotifications.filter((n) => n.isReceivedToday);
-        const activeEarlier = activeNotifications.filter((n) => !n.isReceivedToday);
+        const withHistoricalInvites = formatted.map((n) => {
+          const type = String(n.type || '').toUpperCase();
+          if (type !== 'TOURNAMENT_TEAM_INVITE') return n;
+          const tournamentId =
+            n.rawItem?.data?.tournamentId || n.rawItem?.tournamentId;
+          const teamId = n.rawItem?.data?.teamId || n.rawItem?.teamId;
+          if (!tournamentId || !teamId) return n;
+          const latest = latestInviteIdByKey.get(`${tournamentId}:${teamId}`);
+          if (latest && latest.id !== n.id) {
+            return {
+              ...n,
+              status: 'rejected',
+              actionable: false,
+              isRead: true,
+              rawItem: {
+                ...(n.rawItem || {}),
+                status: 'rejected',
+                actionable: false,
+              },
+            };
+          }
+          return n;
+        });
+
+        const activeToday = withHistoricalInvites.filter((n) => n.isReceivedToday);
+        const activeEarlier = withHistoricalInvites.filter((n) => !n.isReceivedToday);
 
         setTodayList(activeToday);
         setEarlierList(activeEarlier);
       }
+
+      try {
+        await markAllNotificationsReadApi();
+      } catch (markErr) {
+        console.log('Mark all notifications read note:', markErr);
+      }
+      await refreshUnreadCount();
     } catch (err) {
       console.log(
         'Fetch notifications error:',
@@ -1502,7 +1576,7 @@ const NotificationsScreen = ({ navigation }) => {
 
 
       return () => subscription.remove();
-    }, [navigation, respondedIds])
+    }, [navigation])
   );
 
 
@@ -1666,26 +1740,8 @@ const NotificationsScreen = ({ navigation }) => {
         text2: successMsg,
       });
 
-
-      // Remove responded notification
-      setRespondedIds((prev) => [
-        ...prev,
-        String(item.id),
-      ]);
-
-
-      setTodayList((prev) =>
-        prev.filter(
-          (i) => i.id !== item.id
-        )
-      );
-
-
-      setEarlierList((prev) =>
-        prev.filter(
-          (i) => i.id !== item.id
-        )
-      );
+      setTodayList((prev) => markInviteResponded(prev, item.id, 'accepted'));
+      setEarlierList((prev) => markInviteResponded(prev, item.id, 'accepted'));
 
       // Deep link to tournament directly after accepting invite
       const data = raw.data || item.data || {};
@@ -1725,25 +1781,8 @@ const NotificationsScreen = ({ navigation }) => {
           text2: 'Invite was already accepted.',
         });
 
-
-        setRespondedIds((prev) => [
-          ...prev,
-          String(item.id),
-        ]);
-
-
-        setTodayList((prev) =>
-          prev.filter(
-            (i) => i.id !== item.id
-          )
-        );
-
-
-        setEarlierList((prev) =>
-          prev.filter(
-            (i) => i.id !== item.id
-          )
-        );
+        setTodayList((prev) => markInviteResponded(prev, item.id, 'accepted'));
+        setEarlierList((prev) => markInviteResponded(prev, item.id, 'accepted'));
       } else {
         Toast.show({
           type: 'error',
@@ -1756,6 +1795,7 @@ const NotificationsScreen = ({ navigation }) => {
     } finally {
       setLoadingId(null);
       setActionType(null);
+      await refreshUnreadCount();
     }
   };
 
@@ -1819,25 +1859,8 @@ const NotificationsScreen = ({ navigation }) => {
         text2: 'Invite declined.',
       });
 
-
-      setRespondedIds((prev) => [
-        ...prev,
-        String(item.id),
-      ]);
-
-
-      setTodayList((prev) =>
-        prev.filter(
-          (i) => i.id !== item.id
-        )
-      );
-
-
-      setEarlierList((prev) =>
-        prev.filter(
-          (i) => i.id !== item.id
-        )
-      );
+      setTodayList((prev) => markInviteResponded(prev, item.id, 'rejected'));
+      setEarlierList((prev) => markInviteResponded(prev, item.id, 'rejected'));
     } catch (err) {
       console.log(
         'Reject invite error:',
@@ -1859,6 +1882,7 @@ const NotificationsScreen = ({ navigation }) => {
     } finally {
       setLoadingId(null);
       setActionType(null);
+      await refreshUnreadCount();
     }
   };
 
@@ -1867,8 +1891,8 @@ const NotificationsScreen = ({ navigation }) => {
   const renderNotificationCard = (item) => {
     const typeStr = (item.type || '').toUpperCase();
     const statusStr = String(item.status || item.rawItem?.status || '').toLowerCase();
-    const isUnreadStatus = statusStr === 'unread' || (!item.status && !item.isRead);
-    const isActionable = item.actionable !== false && item.rawItem?.actionable !== false;
+    const isUnreadStatus = statusStr === 'unread';
+    const isActionable = item.actionable === true;
 
     const isIncomingInvite =
       typeStr === 'TEAM_MEMBER_INVITE' ||
@@ -1877,8 +1901,7 @@ const NotificationsScreen = ({ navigation }) => {
     const showActionButtons =
       isIncomingInvite &&
       isUnreadStatus &&
-      isActionable &&
-      !respondedIds.includes(String(item.id));
+      isActionable;
 
     const isHighlightCard = isUnreadStatus;
 
@@ -1947,6 +1970,11 @@ const NotificationsScreen = ({ navigation }) => {
             {(statusStr === 'rejected' || statusStr === 'reject' || statusStr === 'declined') && (
               <View style={styles.statusBadgeRejected}>
                 <Text style={styles.statusRejectedText}>Rejected</Text>
+              </View>
+            )}
+            {item.isReinvite && isActionable && (
+              <View style={styles.statusBadgeReinvite}>
+                <Text style={styles.statusReinviteText}>Re-invited</Text>
               </View>
             )}
           </View>
@@ -2096,45 +2124,31 @@ const NotificationsScreen = ({ navigation }) => {
             </View>
           )}
 
-        {todayList.length > 0 && (
+        {!loading &&
+        (todayList.length > 0 || earlierList.length > 0) ? (
           <>
-            <Text
-              style={
-                styles.sectionHeaderTitle
-              }
-            >
-              Today
-            </Text>
-
-
-            {todayList.map(
-              renderNotificationCard
+            <Text style={styles.sectionHeaderTitle}>Today</Text>
+            {todayList.length > 0 ? (
+              todayList.map(renderNotificationCard)
+            ) : (
+              <Text style={styles.emptySectionText}>No notifications today.</Text>
             )}
-          </>
-        )}
 
-
-
-
-        {earlierList.length > 0 && (
-          <>
             <Text
               style={[
                 styles.sectionHeaderTitle,
-                {
-                  marginTop: hp(2),
-                },
+                { marginTop: hp(2) },
               ]}
             >
               Earlier
             </Text>
-
-
-            {earlierList.map(
-              renderNotificationCard
+            {earlierList.length > 0 ? (
+              earlierList.map(renderNotificationCard)
+            ) : (
+              <Text style={styles.emptySectionText}>No earlier notifications.</Text>
             )}
           </>
-        )}
+        ) : null}
 
 
 
@@ -2215,6 +2229,12 @@ const styles = StyleSheet.create({
     color: '#093A24',
 
     marginBottom: hp(1.5),
+  },
+  emptySectionText: {
+    fontFamily: FONTS.medium,
+    fontSize: fontSize(13),
+    color: '#718096',
+    marginBottom: hp(1),
   },
 
 
@@ -2469,6 +2489,19 @@ const styles = StyleSheet.create({
     fontFamily: FONTS.bold,
     fontSize: fontSize(10),
     color: '#E53E3E',
+    textTransform: 'capitalize',
+  },
+  statusBadgeReinvite: {
+    backgroundColor: 'rgba(188, 255, 0, 0.35)',
+    borderRadius: moderateScale(6),
+    paddingHorizontal: wp(1.8),
+    paddingVertical: hp(0.3),
+    marginTop: hp(0.4),
+  },
+  statusReinviteText: {
+    fontFamily: FONTS.bold,
+    fontSize: fontSize(10),
+    color: '#093A24',
     textTransform: 'capitalize',
   },
 });

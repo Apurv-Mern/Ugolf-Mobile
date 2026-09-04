@@ -881,12 +881,22 @@ const ProfileScreen = ({ navigation }) => {
 
 
         {/* =====================================================
-            USER NAME
+            USER NAME & DISPLAY NAME
         ====================================================== */}
 
-        <Text style={styles.userName}>
-          {loggedInName}
-        </Text>
+        <View style={styles.userNameContainer}>
+          <Text style={styles.userName}>
+            {loggedInName}
+          </Text>
+
+          {Boolean(rawUser?.displayName) ? (
+            <View style={styles.displayNameBadge}>
+              <Text style={styles.userDisplayName}>
+                @{rawUser.displayName}
+              </Text>
+            </View>
+          ) : null}
+        </View>
 
 
         {/* =====================================================
@@ -1395,16 +1405,35 @@ const styles = StyleSheet.create({
   },
 
 
-  // ==========================================================
-  // USER NAME
-  // ==========================================================
+  userNameContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: hp(2.5),
+  },
 
   userName: {
     fontFamily: FONTS.bold,
-    fontSize: fontSize(22),
+    fontSize: fontSize(24),
     color: '#093A24',
     textAlign: 'center',
-    marginBottom: hp(2.5),
+    marginBottom: hp(0.5),
+  },
+
+  displayNameBadge: {
+    backgroundColor: 'rgba(9, 58, 36, 0.08)',
+    borderColor: '#093A24',
+    borderWidth: 1,
+    borderRadius: moderateScale(14),
+    paddingHorizontal: wp(3.5),
+    paddingVertical: hp(0.3),
+    marginTop: hp(0.2),
+  },
+
+  userDisplayName: {
+    fontFamily: FONTS.bold,
+    fontSize: fontSize(13),
+    color: '#093A24',
+    textAlign: 'center',
   },
 
 

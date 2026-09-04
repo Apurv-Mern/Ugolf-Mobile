@@ -28,9 +28,10 @@ import {
 import {
   classifyTournamentPlay,
   inProgressActivityMs,
+  leaderboardIndicatesStarted,
   unwrapReadiness,
 } from '../../utils/playProgress';
-import { getPlayerGameHistoryApi } from '../../services/playerService';
+import { getPlayerGameHistoryApi, getTournamentLeaderboardApi } from '../../services/playerService';
 
 const trophyImg = require('../../assets/Images/ trophy.png');
 const homescreenBg = require('../../assets/Images/homescreen_bg.jpg');
@@ -117,7 +118,20 @@ const InProgressGamesScreen = ({ navigation }) => {
       for (let i = 0; i < candidates.length; i++) {
         const t = candidates[i];
         const readiness = readinessResults[i];
-        const play = classifyTournamentPlay(t, readiness);
+        let play = classifyTournamentPlay(t, readiness);
+        if (!play.isInProgress && !play.isCompleted) {
+          try {
+            const board = await getTournamentLeaderboardApi(t.id, {
+              gameNumber: 1,
+              view: 'game',
+            });
+            if (leaderboardIndicatesStarted(board)) {
+              play = classifyTournamentPlay(t, readiness, { anyonePlayed: true });
+            }
+          } catch (_) {
+            /* keep original classification */
+          }
+        }
         if (!play.isInProgress) continue;
 
         const rawMode = String(t.playMode || t.mode || '').toUpperCase();
@@ -183,7 +197,7 @@ const InProgressGamesScreen = ({ navigation }) => {
           holeIndex: play.completedCount,
           totalHoles: play.numberOfGames,
           progress: play.numberOfGames > 0 ? play.completedCount / play.numberOfGames : 0,
-          badge: 'IN PROGRESS',
+          badge: play.gameStarted && !play.hasActiveSession ? 'GAME STARTED' : 'IN PROGRESS',
           actionLabel:
             play.nextGameNumber != null ? `START GAME ${play.nextGameNumber}` : 'CONTINUE',
           date: t.startDate ? formatDisplayDate(t.startDate) : '',

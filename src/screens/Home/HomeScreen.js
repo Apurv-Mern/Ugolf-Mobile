@@ -2210,7 +2210,8 @@ import AuthIcon from '../../components/common/AuthIcon';
 import DotPattern from '../../components/common/DotPattern';
 import ProfileScreen from '../Profile/ProfileScreen';
 import { getTournamentsApi } from '../../services/homeService';
-import { getPlayerGameHistoryApi, getPlayerProfileApi } from '../../services/playerService';
+import { getTournamentTeamsApi } from '../../services/teamService';
+import { getPlayerGameHistoryApi, getPlayerProfileApi, getTournamentLeaderboardApi } from '../../services/playerService';
 import { getUnreadNotificationsCountApi } from '../../services/notificationService';
 import {
   getStartGameReadinessApi,
@@ -2221,6 +2222,9 @@ import {
   classifyTournamentPlay,
   groupGameHistoryByTournament,
   inProgressActivityMs,
+  isChallengePlayMode,
+  isChallengeLocked,
+  leaderboardIndicatesStarted,
   unwrapReadiness,
 } from '../../utils/playProgress';
 
@@ -2230,6 +2234,13 @@ const TAB_ITEMS = [
   { iconName: 'golf-play', label: 'Play', isCenter: true },
   { iconName: 'user', label: 'Profile' },
 ];
+
+const truncateText = (text, maxLength = 25) => {
+  if (!text || typeof text !== 'string') return '';
+  const trimmed = text.trim();
+  if (trimmed.length <= maxLength) return trimmed;
+  return `${trimmed.slice(0, maxLength).trim()}...`;
+};
 
 const HomeScreen = ({ navigation }) => {
   const [activeTab, setActiveTab] = useState(0);
@@ -2406,7 +2417,7 @@ const HomeScreen = ({ navigation }) => {
       holeIndex: completedCount,
       totalHoles: numberOfGames,
       progress: numberOfGames > 0 ? completedCount / numberOfGames : 0,
-      badge: 'IN PROGRESS',
+      badge: item.gameStarted && !item.hasActiveSession ? 'GAME STARTED' : 'IN PROGRESS',
       actionLabel:
         nextGameNumber != null ? `START GAME ${nextGameNumber}` : 'CONTINUE',
     };
@@ -2476,18 +2487,33 @@ const HomeScreen = ({ navigation }) => {
         if (hid && String(hid).includes('-')) idsToCheck.add(String(hid));
       });
 
-      await Promise.all(
-        Array.from(idsToCheck).map((id) =>
+      const teamsById = new Map();
+
+      await Promise.all([
+        ...Array.from(idsToCheck).map((id) =>
           getStartGameReadinessApi(id)
             .then((res) => readinessById.set(id, unwrapReadiness(res)))
             .catch(() => readinessById.set(id, null)),
         ),
-      );
+        ...Array.from(idsToCheck).map((id) =>
+          getTournamentTeamsApi(id)
+            .then((res) => teamsById.set(id, res))
+            .catch(() => teamsById.set(id, null)),
+        ),
+      ]);
 
       const formattedHomeTournaments = merged.map((item) => {
-        const play = classifyTournamentPlay(item.tournament, readinessById.get(String(item.id)));
+        const readinessObj = readinessById.get(String(item.id));
+        const teamsObj = teamsById.get(String(item.id));
+        const play = classifyTournamentPlay(item.tournament, readinessObj);
+        const isLocked =
+          item.tournament?.challengeLocked === true ||
+          item.challengeLocked === true ||
+          isChallengeLocked(item.tournament || item, readinessObj) ||
+          isChallengeLocked(item.tournament || item, teamsObj);
         return {
           ...item,
+          challengeLocked: isLocked,
           shareLinkEnabled: item.tournament?.shareLinkEnabled,
           joinUrl: item.tournament?.joinUrl,
           joinToken: item.tournament?.joinToken,
@@ -2500,8 +2526,37 @@ const HomeScreen = ({ navigation }) => {
           numberOfGames: play.numberOfGames,
           completedCount: play.completedCount,
           completedGameNumbers: play.completedGameNumbers,
+          gameStarted: play.gameStarted,
         };
       });
+
+      // If Team B already played but this user has no session, readiness may
+      // omit gameStarted on an older API. Leaderboard still shows their scores.
+      await Promise.all(
+        formattedHomeTournaments
+          .filter((item) => !item.isInProgress && !item.isCompleted)
+          .map(async (item) => {
+            if (!item.id || !String(item.id).includes('-')) return;
+            try {
+              const board = await getTournamentLeaderboardApi(item.id, {
+                gameNumber: 1,
+                view: 'game',
+              });
+              if (!leaderboardIndicatesStarted(board)) return;
+              const play = classifyTournamentPlay(
+                item.tournament,
+                readinessById.get(String(item.id)),
+                { anyonePlayed: true },
+              );
+              item.isInProgress = play.isInProgress;
+              item.gameStarted = true;
+              item.nextGameNumber = play.nextGameNumber || item.nextGameNumber || 1;
+              item.numberOfGames = play.numberOfGames;
+            } catch (err) {
+              console.log('Home started-game probe note:', err);
+            }
+          }),
+      );
 
       const inProgressItems = formattedHomeTournaments
         .filter((item) => item.isInProgress)
@@ -2529,6 +2584,7 @@ const HomeScreen = ({ navigation }) => {
       setCompletedHistory(groupGameHistoryByTournament(completedOnly));
       setGameHistory(historyList);
       const best = historyList.reduce((max, h) => {
+        if (isChallengePlayMode(h.playMode, h.tournament?.playMode)) return max;
         const s = Number(h.score);
         return Number.isFinite(s) ? Math.max(max, s) : max;
       }, 0);
@@ -2589,11 +2645,17 @@ const HomeScreen = ({ navigation }) => {
       return;
     }
 
-    if (item.source === 'invited') {
-      navigation.navigate('ConfigureGames', {
+    if (
+      item.source === 'invited' ||
+      item.challengeLocked === true ||
+      item.tournament?.challengeLocked === true ||
+      isChallengeLocked(item.tournament || item)
+    ) {
+      navigation.navigate('SelectGame', {
         tournament: item.tournament,
         playMode,
-        isCreator: false,
+        gameNumber: item.nextGameNumber || 1,
+        selectedGameIndex: Math.max(0, (item.nextGameNumber || 1) - 1),
       });
       return;
     }
@@ -2807,7 +2869,11 @@ const HomeScreen = ({ navigation }) => {
           <View style={activeStyles.sectionHeader}>
             <Text style={activeStyles.sectionTitle}>Upcoming Tournaments</Text>
             {upcomingTournaments.length > 0 ? (
-              <TouchableOpacity onPress={() => navigation.navigate('SelectTournament', { playMode: 'practice' })}>
+              <TouchableOpacity
+                onPress={() =>
+                  navigation.navigate('SelectTournament', { showAllModes: true, filterStatus: 'UPCOMING' })
+                }
+              >
                 <Text style={activeStyles.seeAll}>See all</Text>
               </TouchableOpacity>
             ) : null}
@@ -2829,7 +2895,16 @@ const HomeScreen = ({ navigation }) => {
 
                 {/* Top-right mode/invited badges & Share Button */}
                 <View style={activeStyles.tournamentBadges}>
-                  {(item.shareLinkEnabled === true || (item.shareLinkEnabled !== false && (!!item.joinUrl || !!item.joinToken))) ? (
+                  {(item.source === 'mine' ||
+                    (currentUserId &&
+                      String(
+                        item.tournament?.creatorUserId ||
+                        item.tournament?.creatorId ||
+                        item.tournament?.createdBy,
+                      ) === String(currentUserId))) &&
+                    (item.shareLinkEnabled === true ||
+                      (item.shareLinkEnabled !== false &&
+                        (!!item.joinUrl || !!item.joinToken))) ? (
                     <TouchableOpacity
                       style={activeStyles.cardShareBtn}
                       onPress={(e) => {
@@ -2841,13 +2916,16 @@ const HomeScreen = ({ navigation }) => {
                       <AuthIcon name="share" size={moderateScale(13)} color="#093A24" />
                     </TouchableOpacity>
                   ) : null}
-                  {item.source === 'mine' ||
-                  (currentUserId &&
-                    String(
-                      item.tournament?.creatorUserId ||
-                        item.tournament?.creatorId ||
-                        item.tournament?.createdBy,
-                    ) === String(currentUserId)) ? (
+                  {!item.gameStarted &&
+                    !item.challengeLocked &&
+                    !item.tournament?.challengeLocked &&
+                    (item.source === 'mine' ||
+                      (currentUserId &&
+                        String(
+                          item.tournament?.creatorUserId ||
+                          item.tournament?.creatorId ||
+                          item.tournament?.createdBy,
+                        ) === String(currentUserId))) ? (
                     <TouchableOpacity
                       style={activeStyles.cardEditBtn}
                       onPress={(e) => {
@@ -2857,7 +2935,7 @@ const HomeScreen = ({ navigation }) => {
                           isEditing: true,
                           playMode:
                             item.playMode === 'CHALLENGE' ||
-                            String(item.tournament?.playMode || '').toUpperCase().includes('CHALLENGE')
+                              String(item.tournament?.playMode || '').toUpperCase().includes('CHALLENGE')
                               ? 'challenge'
                               : 'practice',
                         });
@@ -2897,14 +2975,14 @@ const HomeScreen = ({ navigation }) => {
 
                 {/* Overlay info */}
                 <View style={activeStyles.tournamentInfo}>
-                  <Text style={activeStyles.tournamentTitle} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>{item.title}</Text>
+                  <Text style={activeStyles.tournamentTitle} numberOfLines={1}>{item.title}</Text>
                   <View style={activeStyles.tournamentMeta}>
                     <View style={activeStyles.metaChip}>
                       <Text style={activeStyles.tournamentMetaText}>📅 {item.date}</Text>
                     </View>
                     {item.location ? (
-                      <View style={[activeStyles.metaChip, { flexShrink: 1, maxWidth: wp(50) }]}>
-                        <Text style={activeStyles.tournamentMetaText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>📍 {item.location}</Text>
+                      <View style={[activeStyles.metaChip, { flexShrink: 1, maxWidth: wp(60) }]}>
+                        <Text style={activeStyles.tournamentMetaText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>📍 {item.location}</Text>
                       </View>
                     ) : null}
                     {item.joined && item.joined !== '—' && item.joined !== 0 ? (
@@ -2937,14 +3015,12 @@ const HomeScreen = ({ navigation }) => {
               const matched = tournaments.find(
                 (t) => String(t.id) === String(item.tournamentId),
               );
-              const rawMode =
-                item.playMode ||
-                matched?.playMode ||
-                matched?.tournament?.playMode ||
-                '';
-              const modeLabel = String(rawMode).toLowerCase().includes('challenge')
-                ? 'Challenge'
-                : 'Practice';
+              const isChallenge = isChallengePlayMode(
+                item.playMode,
+                matched?.playMode,
+                matched?.tournament?.playMode,
+              );
+              const modeLabel = isChallenge ? 'Challenge' : 'Practice';
               const gameCount = item.games?.length || 0;
               const courseText = item.courseName ? ` · ${item.courseName}` : '';
               const gamesLabel = gameCount === 1 ? '1 game' : `${gameCount} games`;
@@ -3396,7 +3472,7 @@ const activeStyles = StyleSheet.create({
   },
   tournamentOverlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(5, 22, 12, 0.55)',
+    backgroundColor: 'rgba(5, 22, 12, 0.45)',
   },
   tournamentInfo: {
     position: 'absolute',
@@ -3405,7 +3481,7 @@ const activeStyles = StyleSheet.create({
     right: 0,
     padding: moderateScale(14),
     paddingRight: wp(12),
-    backgroundColor: 'rgba(5, 25, 16, 0.70)',
+    backgroundColor: 'transparent',
   },
   tournamentTitle: {
     fontFamily: FONTS.bold,

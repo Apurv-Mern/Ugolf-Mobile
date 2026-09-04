@@ -340,6 +340,7 @@ import {
   startGameApi,
   getClubRulesApi,
 } from '../../services/playService';
+import { isChallengeLocked } from '../../utils/playProgress';
 
 // ============================================================
 // HELPERS
@@ -391,20 +392,40 @@ const GameRulesScreen = ({ navigation, route }) => {
   // HARDWARE BACK HANDLING
   // ==========================================================
 
+  const handleBackPress = React.useCallback(() => {
+    const tournamentParam = route?.params?.tournament;
+    const playMode = String(route?.params?.playMode || tournamentParam?.playMode || '').toUpperCase();
+    const isChallenge = playMode.includes('CHALLENGE');
+    const challengeLocked = !!tournamentParam?.challengeLocked || !!route?.params?.challengeLocked || isChallengeLocked(tournamentParam);
+
+    if (isChallenge && challengeLocked) {
+      navigation.reset({
+        index: 0,
+        routes: [{ name: 'MainApp' }],
+      });
+      return true;
+    }
+
+    if (navigation.canGoBack()) {
+      navigation.goBack();
+    } else {
+      navigation.reset({
+        index: 0,
+        routes: [{ name: 'MainApp' }],
+      });
+    }
+    return true;
+  }, [navigation, route?.params]);
+
   useFocusEffect(
     React.useCallback(() => {
-      const onBackPress = () => {
-        navigation.goBack();
-        return true;
-      };
-
       const subscription = BackHandler.addEventListener(
         'hardwareBackPress',
-        onBackPress,
+        handleBackPress,
       );
 
       return () => subscription.remove();
-    }, [navigation]),
+    }, [handleBackPress]),
   );
 
   // ==========================================================
@@ -528,7 +549,7 @@ const GameRulesScreen = ({ navigation, route }) => {
             : 'Good luck on your round!',
         });
 
-        navigation.navigate('ActiveGame', {
+        navigation.replace('ActiveGame', {
           tournament: {
             ...tournamentParam,
             name:
@@ -740,7 +761,7 @@ const GameRulesScreen = ({ navigation, route }) => {
       <View style={styles.headerRow}>
         <TouchableOpacity
           style={styles.backButtonCircle}
-          onPress={() => navigation.goBack()}
+          onPress={handleBackPress}
           activeOpacity={0.7}
         >
           <AuthIcon
@@ -764,14 +785,16 @@ const GameRulesScreen = ({ navigation, route }) => {
         <View style={{ height: hp(3) }} />
       </ScrollView>
 
-      {/* Fixed Start Button */}
-      <View style={styles.btnFixedBottom}>
-        <AuthButton
-          title="LET'S START"
-          onPress={handleStart}
-          loading={starting}
-        />
-      </View>
+      {/* Fixed Start Button — Only show when in gameplay flow with selected tournament */}
+      {Boolean(route?.params?.tournament && (route?.params?.tournament?.id || route?.params?.tournament?._id || route?.params?.tournament?.title || route?.params?.tournament?.name)) ? (
+        <View style={styles.btnFixedBottom}>
+          <AuthButton
+            title="LET'S START"
+            onPress={handleStart}
+            loading={starting}
+          />
+        </View>
+      ) : null}
     </SafeAreaView>
   );
 };

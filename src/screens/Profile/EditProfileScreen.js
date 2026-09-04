@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
@@ -14,9 +14,11 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import Toast from 'react-native-toast-message';
+import { Country, State, City } from 'country-state-city';
 
 import AuthButton from '../../components/common/AuthButton';
 import AuthIcon from '../../components/common/AuthIcon';
+import AuthDropdownPicker from '../../components/common/AuthDropdownPicker';
 import { COLORS } from '../../theme/colors';
 import { FONTS } from '../../theme/fonts';
 import { wp, hp, fontSize, moderateScale } from '../../utils/responsive';
@@ -31,36 +33,87 @@ const EditProfileScreen = ({ navigation }) => {
   const dispatch = useDispatch();
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
+  const [displayName, setDisplayName] = useState('');
   const [email, setEmail] = useState('');
-  const [city, setCity] = useState('');
-  const [stateRegion, setStateRegion] = useState('');
+
+  // Dropdown states
   const [country, setCountry] = useState('');
+  const [countryCode, setCountryCode] = useState('');
+  const [stateRegion, setStateRegion] = useState('');
+  const [stateCode, setStateCode] = useState('');
+  const [city, setCity] = useState('');
   const [saving, setSaving] = useState(false);
+
+  // Country options list from country-state-city
+  const countryOptions = useMemo(() => {
+    return Country.getAllCountries().map((c) => ({
+      label: `${c.flag}  ${c.name}`,
+      name: c.name,
+      value: c.isoCode,
+    }));
+  }, []);
+
+  // State options list for selected country
+  const stateOptions = useMemo(() => {
+    if (!countryCode) return [];
+    return State.getStatesOfCountry(countryCode).map((s) => ({
+      label: s.name,
+      name: s.name,
+      value: s.isoCode,
+    }));
+  }, [countryCode]);
+
+  // City options list for selected state & country
+  const cityOptions = useMemo(() => {
+    if (!countryCode || !stateCode) return [];
+    return City.getCitiesOfState(countryCode, stateCode).map((ci) => ({
+      label: ci.name,
+      name: ci.name,
+      value: ci.name,
+    }));
+  }, [countryCode, stateCode]);
+
+  const populateProfileData = (user) => {
+    if (!user) return;
+    setFirstName(user.firstName || '');
+    setLastName(user.lastName || '');
+    setDisplayName(
+      user.displayName || user.name || `${user.firstName || ''} ${user.lastName || ''}`.trim(),
+    );
+    setEmail(user.email || '');
+
+    const userCountry = user.country || '';
+    const userState = user.state || user.stateRegion || '';
+    const userCity = user.city || '';
+
+    setCountry(userCountry);
+    setStateRegion(userState);
+    setCity(userCity);
+
+    const foundCountry = Country.getAllCountries().find(
+      (c) => c.name.toLowerCase() === userCountry.toLowerCase(),
+    );
+    if (foundCountry) {
+      setCountryCode(foundCountry.isoCode);
+      const foundState = State.getStatesOfCountry(foundCountry.isoCode).find(
+        (s) => s.name.toLowerCase() === userState.toLowerCase(),
+      );
+      if (foundState) {
+        setStateCode(foundState.isoCode);
+      }
+    }
+  };
 
   const loadProfile = useCallback(async () => {
     try {
       const res = await getPlayerProfileApi();
       const player = res?.player || res?.data?.player || res;
-      if (player) {
-        setFirstName(player.firstName || '');
-        setLastName(player.lastName || '');
-        setEmail(player.email || '');
-        setCity(player.city || '');
-        setStateRegion(player.state || '');
-        setCountry(player.country || '');
-      }
+      populateProfileData(player);
     } catch (err) {
       console.log('Load profile error:', err);
       const stored = await getStorageData('USER_DATA');
       const user = stored?.user || stored?.player || stored;
-      if (user) {
-        setFirstName(user.firstName || '');
-        setLastName(user.lastName || '');
-        setEmail(user.email || '');
-        setCity(user.city || '');
-        setStateRegion(user.state || '');
-        setCountry(user.country || '');
-      }
+      populateProfileData(user);
     }
   }, []);
 
@@ -73,16 +126,36 @@ const EditProfileScreen = ({ navigation }) => {
       };
       const subscription = BackHandler.addEventListener('hardwareBackPress', onBackPress);
       return () => subscription.remove();
-    }, [navigation, loadProfile])
+    }, [navigation, loadProfile]),
   );
+
+  const handleSelectCountry = (item) => {
+    setCountry(item.name);
+    setCountryCode(item.value);
+    setStateRegion('');
+    setStateCode('');
+    setCity('');
+  };
+
+  const handleSelectState = (item) => {
+    setStateRegion(item.name);
+    setStateCode(item.value);
+    setCity('');
+  };
+
+  const handleSelectCity = (item) => {
+    setCity(item.name || item.label);
+  };
 
   const handleSaveChanges = async () => {
     setSaving(true);
     try {
+      const computedDisplayName =
+        displayName.trim() || `${firstName.trim()} ${lastName.trim()}`.trim();
       const payload = {
         firstName: firstName.trim(),
         lastName: lastName.trim(),
-        displayName: `${firstName.trim()} ${lastName.trim()}`.trim() || undefined,
+        displayName: computedDisplayName || undefined,
         city: city.trim() || undefined,
         state: stateRegion.trim() || undefined,
         country: country.trim() || undefined,
@@ -100,7 +173,10 @@ const EditProfileScreen = ({ navigation }) => {
       navigation.goBack();
     } catch (err) {
       console.log('Update profile error:', err);
-      const msg = err?.response?.data?.error || err?.response?.data?.message || 'Could not update profile.';
+      const msg =
+        err?.response?.data?.error ||
+        err?.response?.data?.message ||
+        'Could not update profile.';
       Toast.show({
         type: 'error',
         text1: 'Update Failed',
@@ -168,51 +244,61 @@ const EditProfileScreen = ({ navigation }) => {
           />
         </View>
 
+        {/* Display Name (Editable) */}
         <View style={styles.inputCard}>
-          <AuthIcon name="mail" size={moderateScale(18)} color="#718096" style={styles.inputIcon} />
+          <AuthIcon name="user" size={moderateScale(18)} color="#718096" style={styles.inputIcon} />
           <TextInput
             style={styles.textInput}
-            value={email}
-            onChangeText={setEmail}
-            placeholder="Email Address"
+            value={displayName}
+            onChangeText={setDisplayName}
+            placeholder="Display Name"
             placeholderTextColor="#718096"
+          />
+        </View>
+
+        {/* Email Address (Read-Only) */}
+        <View style={[styles.inputCard, styles.readOnlyInputCard]}>
+          <AuthIcon name="mail" size={moderateScale(18)} color="#A0AEC0" style={styles.inputIcon} />
+          <TextInput
+            style={[styles.textInput, styles.readOnlyTextInput]}
+            value={email}
+            editable={false}
+            placeholder="Email Address"
+            placeholderTextColor="#A0AEC0"
             keyboardType="email-address"
             autoCapitalize="none"
           />
+          <AuthIcon name="lock" size={moderateScale(14)} color="#A0AEC0" />
         </View>
 
-        <View style={styles.inputCard}>
-          <AuthIcon name="map-pin" size={moderateScale(18)} color="#718096" style={styles.inputIcon} />
-          <TextInput
-            style={styles.textInput}
-            value={city}
-            onChangeText={setCity}
-            placeholder="City"
-            placeholderTextColor="#718096"
-          />
-        </View>
+        {/* Country Dropdown */}
+        <AuthDropdownPicker
+          iconName="globe"
+          placeholder="Select Country"
+          value={country}
+          options={countryOptions}
+          onSelect={handleSelectCountry}
+        />
 
-        <View style={styles.inputCard}>
-          <AuthIcon name="map-pin" size={moderateScale(18)} color="#718096" style={styles.inputIcon} />
-          <TextInput
-            style={styles.textInput}
-            value={stateRegion}
-            onChangeText={setStateRegion}
-            placeholder="State / Region"
-            placeholderTextColor="#718096"
-          />
-        </View>
+        {/* State Dropdown */}
+        <AuthDropdownPicker
+          iconName="map-pin"
+          placeholder="Select State / Region"
+          value={stateRegion}
+          options={stateOptions}
+          onSelect={handleSelectState}
+          disabled={!countryCode}
+        />
 
-        <View style={styles.inputCard}>
-          <AuthIcon name="map-pin" size={moderateScale(18)} color="#718096" style={styles.inputIcon} />
-          <TextInput
-            style={styles.textInput}
-            value={country}
-            onChangeText={setCountry}
-            placeholder="Country"
-            placeholderTextColor="#718096"
-          />
-        </View>
+        {/* City Dropdown */}
+        <AuthDropdownPicker
+          iconName="map-pin"
+          placeholder="Select City"
+          value={city}
+          options={cityOptions}
+          onSelect={handleSelectCity}
+          disabled={!countryCode || !stateCode}
+        />
 
         {/* Bottom padding for fixed button */}
         <View style={{ height: hp(2) }} />
@@ -324,6 +410,13 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.03,
     shadowRadius: 6,
     elevation: 2,
+  },
+  readOnlyInputCard: {
+    backgroundColor: '#EDF2F7',
+    borderColor: '#E2E8F0',
+  },
+  readOnlyTextInput: {
+    color: '#718096',
   },
   inputIcon: {
     marginRight: wp(3.5),

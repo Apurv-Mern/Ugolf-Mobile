@@ -112,13 +112,15 @@ android/app/src/main/assets/index.android.bundle.meta
 android/.gradle/
 android/build/
 android/app/build/
+android/app/.cxx/
+.cxx/
 
 # iOS dependencies and build files
 ios/Pods/
 ios/build/
 
 # Android APK and App Bundle
-*.apk
+*.apk   
 *.aab
 
 # Xcode
@@ -130,4 +132,4 @@ ios/DerivedData/
 ios/fastlane/report.xml
 ios/fastlane/Preview.html
 ios/fastlane/screenshots/
-ios/fastlane/test_output/
+ios/fastlane/test_output/Archive.zip
