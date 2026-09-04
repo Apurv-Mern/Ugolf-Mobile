@@ -17,6 +17,7 @@ import Toast from 'react-native-toast-message';
 
 import AuthIcon from '../../components/common/AuthIcon';
 import AuthButton from '../../components/common/AuthButton';
+import { submitSupportMessageApi } from '../../services/supportMessageService';
 import { COLORS } from '../../theme/colors';
 import { FONTS } from '../../theme/fonts';
 import { wp, hp, fontSize, moderateScale } from '../../utils/responsive';
@@ -52,6 +53,7 @@ const HelpSupportScreen = ({ navigation }) => {
   const [expandedFaq, setExpandedFaq] = useState(null);
   const [subject, setSubject] = useState('');
   const [message, setMessage] = useState('');
+  const [sending, setSending] = useState(false);
 
   const onBackPress = React.useCallback(() => {
     navigation.goBack();
@@ -69,7 +71,7 @@ const HelpSupportScreen = ({ navigation }) => {
     setExpandedFaq(expandedFaq === id ? null : id);
   };
 
-  const handleSendMessage = () => {
+  const handleSendMessage = async () => {
     if (!subject.trim() || !message.trim()) {
       Toast.show({
         type: 'error',
@@ -79,14 +81,35 @@ const HelpSupportScreen = ({ navigation }) => {
       return;
     }
 
-    Toast.show({
-      type: 'success',
-      text1: 'Message Sent!',
-      text2: 'Thank you for reaching out. Our support team will reply shortly.',
-    });
+    setSending(true);
+    try {
+      await submitSupportMessageApi({
+        subject: subject.trim(),
+        message: message.trim(),
+      });
 
-    setSubject('');
-    setMessage('');
+      Toast.show({
+        type: 'success',
+        text1: 'Message Sent!',
+        text2: 'Thank you for reaching out. Our support team will reply shortly.',
+      });
+
+      setSubject('');
+      setMessage('');
+    } catch (err) {
+      const msg =
+        err?.response?.data?.error ||
+        err?.response?.data?.message ||
+        'Could not send your message. Please try again.';
+
+      Toast.show({
+        type: 'error',
+        text1: 'Send Failed',
+        text2: msg,
+      });
+    } finally {
+      setSending(false);
+    }
   };
 
   const handleEmailSupport = () => {
@@ -207,7 +230,12 @@ const HelpSupportScreen = ({ navigation }) => {
             />
           </View>
 
-          <AuthButton title="SEND MESSAGE" onPress={handleSendMessage} style={{ marginTop: hp(1) }} />
+          <AuthButton
+            title="SEND MESSAGE"
+            onPress={handleSendMessage}
+            loading={sending}
+            style={{ marginTop: hp(1) }}
+          />
         </View>
 
         <View style={{ height: hp(4) }} />

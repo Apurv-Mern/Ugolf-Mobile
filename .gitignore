@@ -113,13 +113,13 @@ android/.gradle/
 android/build/
 android/app/build/
 android/app/
-
+android
 # iOS dependencies and build files
 ios/Pods/
 ios/build/
 
 # Android APK and App Bundle
-*.apk
+*.apk   
 *.aab
 
 # Xcode

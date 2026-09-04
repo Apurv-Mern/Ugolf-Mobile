@@ -1,3 +1,6 @@
 # ninja log v5
-12	345	0	D:/Apurv/Projects/Ugolf-Mobile/android/app/.cxx/Debug/73s1h4wo/armeabi-v7a/CMakeFiles/cmake.verify_globs	3588069bc20a6843
+12	207	0	D:/Apurv/Projects/Ugolf-Mobile/android/app/.cxx/Debug/73s1h4wo/armeabi-v7a/CMakeFiles/cmake.verify_globs	3588069bc20a6843
 1	52	0	clean	783ee98371267ada
+212	3843	8101367477841641	build.ninja	cd097cba45ded968
+1	48	0	D:/Apurv/Projects/Ugolf-Mobile/android/app/.cxx/Debug/73s1h4wo/armeabi-v7a/CMakeFiles/cmake.verify_globs	3588069bc20a6843
+0	25	0	clean	783ee98371267ada

@@ -1229,13 +1229,29 @@ const isUuid = (id) =>
     id
   );
 
+const markInviteResponded = (list, itemId, status) =>
+  list.map((i) =>
+    i.id === itemId
+      ? {
+          ...i,
+          status,
+          actionable: false,
+          isRead: true,
+          rawItem: {
+            ...(i.rawItem || {}),
+            status,
+            actionable: false,
+          },
+        }
+      : i,
+  );
+
 
 // ============================================================
 // Screen
 // ============================================================
 
 const NotificationsScreen = ({ navigation }) => {
-  const [respondedIds, setRespondedIds] = useState([]);
   const [todayList, setTodayList] = useState([]);
   const [earlierList, setEarlierList] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -1466,6 +1482,12 @@ const NotificationsScreen = ({ navigation }) => {
 
             type: item.type,
 
+            isReinvite: !!(
+              item.data?.reinvite ||
+              item.metadata?.reinvite ||
+              item.payload?.reinvite
+            ),
+
             rawItem: item,
           };
         });
@@ -1510,12 +1532,8 @@ const NotificationsScreen = ({ navigation }) => {
           return n;
         });
 
-        const activeNotifications = withHistoricalInvites.filter(
-          (n) => !respondedIds.includes(String(n.id))
-        );
-
-        const activeToday = activeNotifications.filter((n) => n.isReceivedToday);
-        const activeEarlier = activeNotifications.filter((n) => !n.isReceivedToday);
+        const activeToday = withHistoricalInvites.filter((n) => n.isReceivedToday);
+        const activeEarlier = withHistoricalInvites.filter((n) => !n.isReceivedToday);
 
         setTodayList(activeToday);
         setEarlierList(activeEarlier);
@@ -1558,7 +1576,7 @@ const NotificationsScreen = ({ navigation }) => {
 
 
       return () => subscription.remove();
-    }, [navigation, respondedIds])
+    }, [navigation])
   );
 
 
@@ -1722,26 +1740,8 @@ const NotificationsScreen = ({ navigation }) => {
         text2: successMsg,
       });
 
-
-      // Remove responded notification
-      setRespondedIds((prev) => [
-        ...prev,
-        String(item.id),
-      ]);
-
-
-      setTodayList((prev) =>
-        prev.filter(
-          (i) => i.id !== item.id
-        )
-      );
-
-
-      setEarlierList((prev) =>
-        prev.filter(
-          (i) => i.id !== item.id
-        )
-      );
+      setTodayList((prev) => markInviteResponded(prev, item.id, 'accepted'));
+      setEarlierList((prev) => markInviteResponded(prev, item.id, 'accepted'));
 
       // Deep link to tournament directly after accepting invite
       const data = raw.data || item.data || {};
@@ -1781,25 +1781,8 @@ const NotificationsScreen = ({ navigation }) => {
           text2: 'Invite was already accepted.',
         });
 
-
-        setRespondedIds((prev) => [
-          ...prev,
-          String(item.id),
-        ]);
-
-
-        setTodayList((prev) =>
-          prev.filter(
-            (i) => i.id !== item.id
-          )
-        );
-
-
-        setEarlierList((prev) =>
-          prev.filter(
-            (i) => i.id !== item.id
-          )
-        );
+        setTodayList((prev) => markInviteResponded(prev, item.id, 'accepted'));
+        setEarlierList((prev) => markInviteResponded(prev, item.id, 'accepted'));
       } else {
         Toast.show({
           type: 'error',
@@ -1876,25 +1859,8 @@ const NotificationsScreen = ({ navigation }) => {
         text2: 'Invite declined.',
       });
 
-
-      setRespondedIds((prev) => [
-        ...prev,
-        String(item.id),
-      ]);
-
-
-      setTodayList((prev) =>
-        prev.filter(
-          (i) => i.id !== item.id
-        )
-      );
-
-
-      setEarlierList((prev) =>
-        prev.filter(
-          (i) => i.id !== item.id
-        )
-      );
+      setTodayList((prev) => markInviteResponded(prev, item.id, 'rejected'));
+      setEarlierList((prev) => markInviteResponded(prev, item.id, 'rejected'));
     } catch (err) {
       console.log(
         'Reject invite error:',
@@ -1935,8 +1901,7 @@ const NotificationsScreen = ({ navigation }) => {
     const showActionButtons =
       isIncomingInvite &&
       isUnreadStatus &&
-      isActionable &&
-      !respondedIds.includes(String(item.id));
+      isActionable;
 
     const isHighlightCard = isUnreadStatus;
 
@@ -2005,6 +1970,11 @@ const NotificationsScreen = ({ navigation }) => {
             {(statusStr === 'rejected' || statusStr === 'reject' || statusStr === 'declined') && (
               <View style={styles.statusBadgeRejected}>
                 <Text style={styles.statusRejectedText}>Rejected</Text>
+              </View>
+            )}
+            {item.isReinvite && isActionable && (
+              <View style={styles.statusBadgeReinvite}>
+                <Text style={styles.statusReinviteText}>Re-invited</Text>
               </View>
             )}
           </View>
@@ -2519,6 +2489,19 @@ const styles = StyleSheet.create({
     fontFamily: FONTS.bold,
     fontSize: fontSize(10),
     color: '#E53E3E',
+    textTransform: 'capitalize',
+  },
+  statusBadgeReinvite: {
+    backgroundColor: 'rgba(188, 255, 0, 0.35)',
+    borderRadius: moderateScale(6),
+    paddingHorizontal: wp(1.8),
+    paddingVertical: hp(0.3),
+    marginTop: hp(0.4),
+  },
+  statusReinviteText: {
+    fontFamily: FONTS.bold,
+    fontSize: fontSize(10),
+    color: '#093A24',
     textTransform: 'capitalize',
   },
 });
