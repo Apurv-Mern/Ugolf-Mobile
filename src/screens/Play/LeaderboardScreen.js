@@ -438,7 +438,7 @@ import { FONTS } from '../../theme/fonts';
 import { wp, hp, fontSize, moderateScale } from '../../utils/responsive';
 import { getTournamentLeaderboardApi } from '../../services/playerService';
 
-const tournamentBg = require('../../assets/Images/tournament_bg.jpg');
+const trophyImg = require('../../assets/Images/ trophy.png');
 const isUuid = (id) => typeof id === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
 
 const LeaderboardScreen = ({ navigation, route }) => {
@@ -548,16 +548,26 @@ const LeaderboardScreen = ({ navigation, route }) => {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        {/* Banner Header with Golf Course Landscape Image */}
-        <ImageBackground source={tournamentBg} style={styles.header} resizeMode="cover">
+        {/* Banner Header with Trophy Image */}
+        <ImageBackground source={trophyImg} style={styles.header} resizeMode="cover">
           <View style={styles.headerOverlay} />
+
+          {/* Back Button */}
+          <TouchableOpacity
+            style={styles.backButtonCircle}
+            onPress={handleBackToHome}
+            activeOpacity={0.7}
+          >
+            <AuthIcon name="chevron-left" size={moderateScale(22)} color="#093A24" />
+          </TouchableOpacity>
+
           <Text style={styles.bannerTitle}>Leaderboard</Text>
-          <View style={styles.subPillBadge}>
+          <View style={styles.subtitleBadge}>
             <Text
               style={styles.bannerSubtitle}
               numberOfLines={1}
               adjustsFontSizeToFit
-              minimumFontScale={0.7}
+              minimumFontScale={0.75}
             >
               Game {selectedGame} · {modeLabel} · {meta.tournamentName}
             </Text>
@@ -713,50 +723,54 @@ const styles = StyleSheet.create({
   // Banner Header
   header: {
     backgroundColor: '#093A24',
-    paddingTop: Platform.OS === 'ios' ? hp(8.5) : hp(6.5),
+    paddingTop: Platform.OS === 'ios' ? hp(6) : hp(4.5),
     paddingHorizontal: wp(5),
-    paddingBottom: hp(6.5),
-    minHeight: hp(25),
-    justifyContent: 'center',
+    paddingBottom: hp(5),
     position: 'relative',
   },
   headerOverlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(5, 30, 19, 0.82)',
+    backgroundColor: 'rgba(9, 58, 36, 0.40)',
+  },
+  backButtonCircle: {
+    width: moderateScale(38),
+    height: moderateScale(38),
+    borderRadius: moderateScale(19),
+    backgroundColor: COLORS.white,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: hp(2),
+    elevation: 4,
+    shadowColor: COLORS.black,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 5,
+    zIndex: 10,
   },
   bannerTitle: {
     fontFamily: FONTS.bold,
     fontSize: fontSize(28),
-    color: '#FFFFFF',
-    marginTop: hp(1),
-    textShadowColor: 'rgba(0, 0, 0, 0.95)',
+    color: COLORS.white,
+    textShadowColor: 'rgba(0, 0, 0, 0.3)',
     textShadowOffset: { width: 0, height: 2 },
-    textShadowRadius: 6,
+    textShadowRadius: 4,
   },
-  subPillBadge: {
+  subtitleBadge: {
     alignSelf: 'flex-start',
-    backgroundColor: '#062618',
+    backgroundColor: 'rgba(9, 58, 36, 0.75)',
     borderRadius: moderateScale(20),
     paddingHorizontal: wp(3.5),
-    paddingVertical: hp(0.6),
+    paddingVertical: hp(0.5),
     marginTop: hp(1),
     maxWidth: wp(90),
-    borderWidth: 1.5,
-    borderColor: '#BCFF00',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-    elevation: 3,
+    borderWidth: 1,
+    borderColor: 'rgba(188, 255, 0, 0.5)',
   },
   bannerSubtitle: {
     fontFamily: FONTS.bold,
     fontSize: fontSize(12.5),
     color: '#BCFF00',
     letterSpacing: 0.3,
-    textShadowColor: 'rgba(0, 0, 0, 0.8)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 2,
   },
 
   // Content
