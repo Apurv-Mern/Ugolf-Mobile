@@ -16,9 +16,10 @@ export const haversineMeters = (a, b) => {
 };
 
 export const formatDistance = (meters) => {
-  const yards = meters * 1.09361;
-  if (yards < 30) return `${Math.round(yards)} yd`;
-  return `${Math.round(yards)} yd (${Math.round(meters)} m)`;
+  // const yards = meters * 1.09361;
+  // if (yards < 30) return `${Math.round(yards)} yd`;
+  // return `${Math.round(yards)} yd (${Math.round(meters)} m)`;
+  return `${Math.round(meters)} m`;
 };
 
 export const poiLabel = (poi) => {

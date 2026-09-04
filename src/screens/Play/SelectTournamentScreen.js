@@ -657,6 +657,13 @@ const getTournamentHeadCount = (item) => {
 
 import { formatDisplayDate } from '../../utils/dateUtils';
 
+const truncateText = (text, maxLength = 25) => {
+  if (!text || typeof text !== 'string') return '';
+  const trimmed = text.trim();
+  if (trimmed.length <= maxLength) return trimmed;
+  return `${trimmed.slice(0, maxLength).trim()}...`;
+};
+
 const SelectTournamentScreen = ({ navigation, route }) => {
   const currentUser = useSelector((state) => state.auth?.user);
   const currentUserId = currentUser?.id || currentUser?._id || currentUser?.userId;
@@ -825,11 +832,22 @@ const SelectTournamentScreen = ({ navigation, route }) => {
       // Filter out completed tournaments (they are shown on Home screen completed section)
       const uncompletedOnly = finalFormatted.filter((t) => t.isCompleted !== true);
 
+      const filterStatus = route?.params?.filterStatus;
+      let statusFiltered = uncompletedOnly;
+
+      if (filterStatus === 'UPCOMING') {
+        // Only show upcoming (not started / not in-progress) tournaments
+        statusFiltered = uncompletedOnly.filter((t) => t.isInProgress !== true && t.gameStarted !== true && t.hasActiveSession !== true);
+      } else if (filterStatus === 'IN_PROGRESS') {
+        // Only show in-progress tournaments
+        statusFiltered = uncompletedOnly.filter((t) => t.isInProgress === true || t.gameStarted === true || t.hasActiveSession === true);
+      }
+
       const currentPlayMode = (route?.params?.playMode || playMode || '').toLowerCase();
-      let modeFiltered = uncompletedOnly;
+      let modeFiltered = statusFiltered;
       // Home "See all" should list every mine + invited event, both modes.
       if (!showAllModes && currentPlayMode) {
-        modeFiltered = uncompletedOnly.filter((t) => {
+        modeFiltered = statusFiltered.filter((t) => {
           const tMode = (t.playMode || '').toLowerCase();
           if (currentPlayMode === 'practice' || currentPlayMode.includes('practice')) {
             return tMode === 'practice' || tMode === 'practice_round' || tMode.includes('practice');
@@ -1026,7 +1044,7 @@ const SelectTournamentScreen = ({ navigation, route }) => {
 
           {/* Bottom Info Content */}
           <View style={styles.tournamentCardContent}>
-            <Text style={styles.tournamentCardName} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
+            <Text style={styles.tournamentCardName} numberOfLines={1}>
               {item.title}
             </Text>
             <View style={styles.tournamentMetaRow}>
@@ -1034,8 +1052,8 @@ const SelectTournamentScreen = ({ navigation, route }) => {
                 <Text style={styles.metaBadgeText}>📅 {item.date}</Text>
               </View>
               {item.location ? (
-                <View style={[styles.metaBadge, { flexShrink: 1, maxWidth: wp(50) }]}>
-                  <Text style={styles.metaBadgeText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
+                <View style={[styles.metaBadge, { flexShrink: 1, maxWidth: wp(60) }]}>
+                  <Text style={styles.metaBadgeText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>
                     📍 {item.location}
                   </Text>
                 </View>

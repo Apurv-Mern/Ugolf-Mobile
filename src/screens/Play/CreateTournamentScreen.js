@@ -278,8 +278,8 @@ const CreateTournamentScreen = ({ navigation, route }) => {
   const [teamSize, setTeamSize] = useState(
     String(
       route?.params?.teamSize ||
-        tournamentParam?.teamSize ||
-        (isChallengeMode ? '4' : '5'),
+      tournamentParam?.teamSize ||
+      (isChallengeMode ? '4' : '5'),
     ),
   );
   const [challengeLocked, setChallengeLocked] = useState(
@@ -774,6 +774,9 @@ const CreateTournamentScreen = ({ navigation, route }) => {
     if (!tournamentName.trim()) {
       setTournamentNameError('Please enter a tournament name.');
       hasError = true;
+    } else if (tournamentName.trim().length > 30) {
+      setTournamentNameError('Tournament name cannot exceed 30 characters.');
+      hasError = true;
     }
     if (!description.trim()) {
       setDescriptionError('Please enter a description.');
@@ -1045,13 +1048,19 @@ const CreateTournamentScreen = ({ navigation, route }) => {
         keyboardShouldPersistTaps="handled"
       >
         {/* Tournament Name */}
-        <Text style={styles.formLabel}>Tournament Name</Text>
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+          <Text style={styles.formLabel}>Tournament Name</Text>
+          <Text style={{ fontFamily: FONTS.medium, fontSize: fontSize(11), color: tournamentName.length >= 30 ? '#E53E3E' : '#718096', marginBottom: hp(0.8) }}>
+            {tournamentName.length}/30
+          </Text>
+        </View>
         <View style={styles.formInputWrapper}>
           <TextInput
             style={styles.formTextInput}
             placeholder="e.g. Summer Masters Cup"
             placeholderTextColor="#A0AEC0"
             value={tournamentName}
+            maxLength={30}
             onChangeText={(text) => {
               setTournamentName(text);
               if (tournamentNameError) setTournamentNameError('');
@@ -1125,13 +1134,19 @@ const CreateTournamentScreen = ({ navigation, route }) => {
           </View>
 
           <View style={styles.halfColumn}>
-            <Text style={styles.formLabel}>Suburb / City</Text>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+              <Text style={styles.formLabel}>Suburb / City</Text>
+              <Text style={{ fontFamily: FONTS.medium, fontSize: fontSize(11), color: (suburb || city).length >= 25 ? '#E53E3E' : '#718096', marginBottom: hp(0.8) }}>
+                {(suburb || city).length}/25
+              </Text>
+            </View>
             <View style={styles.formInputWrapper}>
               <TextInput
                 style={styles.formTextInput}
                 placeholder="Suburb / City"
                 placeholderTextColor="#A0AEC0"
                 value={suburb || city}
+                maxLength={25}
                 onChangeText={(text) => {
                   setSuburb(text);
                   setCity(text);
@@ -1151,7 +1166,7 @@ const CreateTournamentScreen = ({ navigation, route }) => {
           onPress={handleOpenGolfClubDropdown}
           activeOpacity={0.8}
         >
-          <Text style={[styles.dropdownValueText, { flex: 1 }]} numberOfLines={1}>
+          <Text style={[styles.dropdownValueText, { flex: 1 }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>
             {golfClub}
           </Text>
           {clubHasMap != null ? (
@@ -1388,10 +1403,10 @@ const CreateTournamentScreen = ({ navigation, route }) => {
                 <TextInput
                   style={styles.modalSearchInput}
                   placeholder={`Search ${activeDropdown === 'country'
-                      ? 'country'
-                      : activeDropdown === 'golfClub'
-                        ? 'golf club'
-                        : 'state'
+                    ? 'country'
+                    : activeDropdown === 'golfClub'
+                      ? 'golf club'
+                      : 'state'
                     }...`}
                   placeholderTextColor="#A0AEC0"
                   value={dropdownSearchQuery}

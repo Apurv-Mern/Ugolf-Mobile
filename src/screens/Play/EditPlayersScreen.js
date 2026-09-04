@@ -6,6 +6,7 @@ import {
   ScrollView,
   StatusBar,
   BackHandler,
+  ActivityIndicator,
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import Toast from 'react-native-toast-message';
@@ -151,7 +152,38 @@ const EditPlayersScreen = ({ navigation, route }) => {
             }
           });
 
-          setFriends(allList);
+          setFriends((prevFriends) => {
+            const selectedIds = new Set(
+              (Array.isArray(prevFriends) ? prevFriends : [])
+                .filter((f) => f.selected)
+                .map((f) => String(f.id))
+            );
+            const unselectedIds = new Set(
+              (Array.isArray(prevFriends) ? prevFriends : [])
+                .filter((f) => !f.selected)
+                .map((f) => String(f.id))
+            );
+            const updatedAllList = allList.map((item) => {
+              const idStr = String(item.id);
+              if (selectedIds.has(idStr)) {
+                return { ...item, selected: true };
+              }
+              if (unselectedIds.has(idStr) && item.isExisting) {
+                return { ...item, selected: false };
+              }
+              return item;
+            });
+            (Array.isArray(prevFriends) ? prevFriends : []).forEach((prevItem) => {
+              if (
+                prevItem.selected &&
+                !prevItem.isExisting &&
+                !updatedAllList.some((u) => String(u.id) === String(prevItem.id))
+              ) {
+                updatedAllList.push(prevItem);
+              }
+            });
+            return updatedAllList;
+          });
         }
       } catch (err) {
         console.log('Edit players load error:', err);
@@ -324,19 +356,35 @@ const EditPlayersScreen = ({ navigation, route }) => {
           style={styles.search}
         />
 
-        {existingPlayers.length > 0 && (
-          <View style={styles.sectionHeaderWrap}>
-            <Text style={styles.sectionHeaderText}>ON THIS TEAM</Text>
-          </View>
-        )}
-        {existingPlayers.map((item, idx) => renderPlayerRow(item, idx, 'existing'))}
+        {loading ? (
+          <ActivityIndicator
+            size="large"
+            color={COLORS.textPrimary}
+            style={{ marginTop: hp(4) }}
+          />
+        ) : filteredFriends.length === 0 ? (
+          <Text style={styles.stateText}>
+            {searchQuery.trim()
+              ? `No players found for "${searchQuery.trim()}".`
+              : 'No players available right now.'}
+          </Text>
+        ) : (
+          <>
+            {existingPlayers.length > 0 && (
+              <View style={styles.sectionHeaderWrap}>
+                <Text style={styles.sectionHeaderText}>ON THIS TEAM</Text>
+              </View>
+            )}
+            {existingPlayers.map((item, idx) => renderPlayerRow(item, idx, 'existing'))}
 
-        {invitePlayers.length > 0 && (
-          <View style={[styles.sectionHeaderWrap, existingPlayers.length > 0 && styles.sectionSpacer]}>
-            <Text style={styles.sectionHeaderText}>INVITE PLAYERS</Text>
-          </View>
+            {invitePlayers.length > 0 && (
+              <View style={[styles.sectionHeaderWrap, existingPlayers.length > 0 && styles.sectionSpacer]}>
+                <Text style={styles.sectionHeaderText}>INVITE PLAYERS</Text>
+              </View>
+            )}
+            {invitePlayers.map((item, idx) => renderPlayerRow(item, idx, 'candidate'))}
+          </>
         )}
-        {invitePlayers.map((item, idx) => renderPlayerRow(item, idx, 'candidate'))}
 
         <View style={{ height: hp(2) }} />
       </ScrollView>
@@ -391,6 +439,15 @@ const styles = StyleSheet.create({
   bottomActions: {
     paddingTop: hp(1),
     backgroundColor: COLORS.bgPage,
+  },
+  stateText: {
+    fontFamily: FONTS.medium,
+    fontSize: fontSize(13),
+    color: COLORS.textMuted || '#718096',
+    textAlign: 'center',
+    marginTop: hp(4),
+    paddingHorizontal: wp(4),
+    lineHeight: fontSize(20),
   },
 });
 

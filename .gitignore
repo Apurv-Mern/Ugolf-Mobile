@@ -112,8 +112,9 @@ android/app/src/main/assets/index.android.bundle.meta
 android/.gradle/
 android/build/
 android/app/build/
-android/app/
-android
+android/app/.cxx/
+.cxx/
+
 # iOS dependencies and build files
 ios/Pods/
 ios/build/

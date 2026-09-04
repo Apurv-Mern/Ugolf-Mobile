@@ -322,7 +322,7 @@
 					"-ObjC",
 					"-lc++",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = com.dotsquares.ugolf;
+				PRODUCT_BUNDLE_IDENTIFIER = "UGolf---com.dotsquares.ugolf";
 				PRODUCT_NAME = UGolf;
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
@@ -354,7 +354,7 @@
 					"-ObjC",
 					"-lc++",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = com.dotsquares.ugolf;
+				PRODUCT_BUNDLE_IDENTIFIER = "UGolf---com.dotsquares.ugolf";
 				PRODUCT_NAME = UGolf;
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
 				SWIFT_VERSION = 5.0;

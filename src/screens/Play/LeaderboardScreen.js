@@ -438,7 +438,7 @@ import { FONTS } from '../../theme/fonts';
 import { wp, hp, fontSize, moderateScale } from '../../utils/responsive';
 import { getTournamentLeaderboardApi } from '../../services/playerService';
 
-const tournamentBg = require('../../assets/Images/tournament_bg.jpg');
+const trophyImg = require('../../assets/Images/ trophy.png');
 const isUuid = (id) => typeof id === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
 
 const LeaderboardScreen = ({ navigation, route }) => {
@@ -548,12 +548,27 @@ const LeaderboardScreen = ({ navigation, route }) => {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        {/* Banner Header with Golf Course Landscape Image */}
-        <ImageBackground source={tournamentBg} style={styles.header} resizeMode="cover">
+        {/* Banner Header with Trophy Image */}
+        <ImageBackground source={trophyImg} style={styles.header} resizeMode="cover">
           <View style={styles.headerOverlay} />
+
+          {/* Back Button */}
+          <TouchableOpacity
+            style={styles.backButtonCircle}
+            onPress={handleBackToHome}
+            activeOpacity={0.7}
+          >
+            <AuthIcon name="chevron-left" size={moderateScale(22)} color="#093A24" />
+          </TouchableOpacity>
+
           <Text style={styles.bannerTitle}>Leaderboard</Text>
-          <View style={styles.subPillBadge}>
-            <Text style={styles.bannerSubtitle} numberOfLines={1} ellipsizeMode="tail">
+          <View style={styles.subtitleBadge}>
+            <Text
+              style={styles.bannerSubtitle}
+              numberOfLines={1}
+              adjustsFontSizeToFit
+              minimumFontScale={0.75}
+            >
               Game {selectedGame} · {modeLabel} · {meta.tournamentName}
             </Text>
           </View>
@@ -600,10 +615,12 @@ const LeaderboardScreen = ({ navigation, route }) => {
                     challengeTeams.map((team) => (
                       <View key={team.teamId || team.teamName} style={styles.teamBoardCard}>
                         <View style={styles.teamBoardHeader}>
-                          <Text style={styles.teamBoardRank}>#{team.rank}</Text>
-                          <Text style={styles.teamBoardName} numberOfLines={1}>
-                            {team.teamName || 'Team'}
-                          </Text>
+                          <View style={styles.teamInfoCol}>
+                            <Text style={styles.teamBoardRank}>#{team.rank}</Text>
+                            <Text style={styles.teamBoardName} numberOfLines={1}>
+                              {team.teamName || 'Team'}
+                            </Text>
+                          </View>
                           <Text style={styles.teamBoardTotal}>{team.totalScore ?? 0}</Text>
                         </View>
                         {(team.players || []).map((player, idx) => {
@@ -613,9 +630,11 @@ const LeaderboardScreen = ({ navigation, route }) => {
                               key={`${playerId || player.playerName || idx}`}
                               style={styles.teamPlayerRow}
                             >
-                              <Text style={styles.teamPlayerName} numberOfLines={1}>
-                                {player.playerName || player.name || 'Player'}
-                              </Text>
+                              <View style={styles.playerInfoColChallenge}>
+                                <Text style={styles.teamPlayerName} numberOfLines={1}>
+                                  {player.playerName || player.name || 'Player'}
+                                </Text>
+                              </View>
                               <Text style={styles.teamPlayerScore}>{player.score ?? 0}</Text>
                             </View>
                           );
@@ -704,39 +723,54 @@ const styles = StyleSheet.create({
   // Banner Header
   header: {
     backgroundColor: '#093A24',
-    paddingTop: Platform.OS === 'ios' ? hp(7) : hp(5),
+    paddingTop: Platform.OS === 'ios' ? hp(6) : hp(4.5),
     paddingHorizontal: wp(5),
-    paddingBottom: hp(7),
-    minHeight: hp(24),
-    justifyContent: 'center',
+    paddingBottom: hp(5),
     position: 'relative',
   },
   headerOverlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(9, 58, 36, 0.45)',
+    backgroundColor: 'rgba(9, 58, 36, 0.40)',
+  },
+  backButtonCircle: {
+    width: moderateScale(38),
+    height: moderateScale(38),
+    borderRadius: moderateScale(19),
+    backgroundColor: COLORS.white,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: hp(2),
+    elevation: 4,
+    shadowColor: COLORS.black,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 5,
+    zIndex: 10,
   },
   bannerTitle: {
     fontFamily: FONTS.bold,
     fontSize: fontSize(28),
     color: COLORS.white,
+    textShadowColor: 'rgba(0, 0, 0, 0.3)',
+    textShadowOffset: { width: 0, height: 2 },
+    textShadowRadius: 4,
   },
-  subPillBadge: {
+  subtitleBadge: {
     alignSelf: 'flex-start',
-    backgroundColor: 'rgba(5, 25, 16, 0.70)',
-    borderRadius: moderateScale(10),
-    paddingHorizontal: wp(3),
+    backgroundColor: 'rgba(9, 58, 36, 0.75)',
+    borderRadius: moderateScale(20),
+    paddingHorizontal: wp(3.5),
     paddingVertical: hp(0.5),
-    marginTop: hp(0.8),
+    marginTop: hp(1),
+    maxWidth: wp(90),
     borderWidth: 1,
-    borderColor: 'rgba(188, 255, 0, 0.35)',
+    borderColor: 'rgba(188, 255, 0, 0.5)',
   },
   bannerSubtitle: {
     fontFamily: FONTS.bold,
-    fontSize: fontSize(12),
-    color: '#FFFFFF',
-    textShadowColor: 'rgba(0, 0, 0, 0.9)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 2,
+    fontSize: fontSize(12.5),
+    color: '#BCFF00',
+    letterSpacing: 0.3,
   },
 
   // Content
@@ -825,11 +859,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: hp(1),
   },
+  teamInfoCol: {
+    flex: 2,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
   teamBoardRank: {
     fontFamily: FONTS.bold,
     fontSize: fontSize(14),
     color: '#093A24',
-    width: wp(8),
+    marginRight: wp(2.5),
   },
   teamBoardName: {
     flex: 1,
@@ -838,17 +877,23 @@ const styles = StyleSheet.create({
     color: '#093A24',
   },
   teamBoardTotal: {
+    flex: 1,
     fontFamily: FONTS.bold,
     fontSize: fontSize(16),
     color: '#093A24',
+    textAlign: 'center',
   },
   teamPlayerRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
     paddingVertical: hp(0.7),
     borderTopWidth: 1,
     borderTopColor: '#EDF2F7',
+  },
+  playerInfoColChallenge: {
+    flex: 2,
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   teamPlayerName: {
     flex: 1,
@@ -857,9 +902,11 @@ const styles = StyleSheet.create({
     color: '#4A5568',
   },
   teamPlayerScore: {
+    flex: 1,
     fontFamily: FONTS.bold,
     fontSize: fontSize(14),
     color: '#093A24',
+    textAlign: 'center',
   },
   playerInfoCol: {
     flex: 2,

@@ -549,7 +549,7 @@ const GameRulesScreen = ({ navigation, route }) => {
             : 'Good luck on your round!',
         });
 
-        navigation.navigate('ActiveGame', {
+        navigation.replace('ActiveGame', {
           tournament: {
             ...tournamentParam,
             name:
@@ -785,14 +785,16 @@ const GameRulesScreen = ({ navigation, route }) => {
         <View style={{ height: hp(3) }} />
       </ScrollView>
 
-      {/* Fixed Start Button */}
-      <View style={styles.btnFixedBottom}>
-        <AuthButton
-          title="LET'S START"
-          onPress={handleStart}
-          loading={starting}
-        />
-      </View>
+      {/* Fixed Start Button — Only show when in gameplay flow with selected tournament */}
+      {Boolean(route?.params?.tournament && (route?.params?.tournament?.id || route?.params?.tournament?._id || route?.params?.tournament?.title || route?.params?.tournament?.name)) ? (
+        <View style={styles.btnFixedBottom}>
+          <AuthButton
+            title="LET'S START"
+            onPress={handleStart}
+            loading={starting}
+          />
+        </View>
+      ) : null}
     </SafeAreaView>
   );
 };

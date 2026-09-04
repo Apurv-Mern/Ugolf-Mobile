@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState } from "react";
 import {
   View,
   Text,
@@ -10,49 +10,49 @@ import {
   BackHandler,
   Platform,
   Linking,
-} from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { useFocusEffect } from '@react-navigation/native';
-import Toast from 'react-native-toast-message';
+} from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { useFocusEffect } from "@react-navigation/native";
+import Toast from "react-native-toast-message";
 
-import AuthIcon from '../../components/common/AuthIcon';
-import AuthButton from '../../components/common/AuthButton';
-import { submitSupportMessageApi } from '../../services/supportMessageService';
-import { COLORS } from '../../theme/colors';
-import { FONTS } from '../../theme/fonts';
-import { wp, hp, fontSize, moderateScale } from '../../utils/responsive';
+import AuthIcon from "../../components/common/AuthIcon";
+import AuthButton from "../../components/common/AuthButton";
+import { submitSupportMessageApi } from "../../services/supportMessageService";
+import { COLORS } from "../../theme/colors";
+import { FONTS } from "../../theme/fonts";
+import { wp, hp, fontSize, moderateScale } from "../../utils/responsive";
 
 const FAQ_LIST = [
   {
-    id: '1',
-    question: 'How do I create a new tournament?',
+    id: "1",
+    question: "How do I create a new tournament?",
     answer:
       'Go to the Play tab on the bottom menu, tap "Create Tournament", fill in your tournament details, and configure your games.',
   },
   {
-    id: '2',
-    question: 'How do I add or edit players in my team?',
+    id: "2",
+    question: "How do I add or edit players in my team?",
     answer:
-      'Navigate to Profile > My Teams, tap the edit icon next to your team, and select/unselect your team players.',
+      "Navigate to Profile > My Teams, tap the edit icon next to your team, and select/unselect your team players.",
   },
   {
-    id: '3',
-    question: 'How are scores and handicaps calculated?',
+    id: "3",
+    question: "How are scores and handicaps calculated?",
     answer:
-      'Scores are updated live per hole according to standard USGA net scoring and course handicap ratings.',
+      "Scores are updated live per hole according to standard USGA net scoring and course handicap ratings.",
   },
   {
-    id: '4',
-    question: 'How do I manage my subscription plan?',
+    id: "4",
+    question: "How do I manage my subscription plan?",
     answer:
-      'Go to Profile > Subscription to view your current tier (Champion) or change your plan details.',
+      "Go to Profile > Subscription to view your current tier (Champion) or change your plan details.",
   },
 ];
 
 const HelpSupportScreen = ({ navigation }) => {
   const [expandedFaq, setExpandedFaq] = useState(null);
-  const [subject, setSubject] = useState('');
-  const [message, setMessage] = useState('');
+  const [subject, setSubject] = useState("");
+  const [message, setMessage] = useState("");
   const [sending, setSending] = useState(false);
 
   const onBackPress = React.useCallback(() => {
@@ -62,9 +62,12 @@ const HelpSupportScreen = ({ navigation }) => {
 
   useFocusEffect(
     React.useCallback(() => {
-      const subscription = BackHandler.addEventListener('hardwareBackPress', onBackPress);
+      const subscription = BackHandler.addEventListener(
+        "hardwareBackPress",
+        onBackPress,
+      );
       return () => subscription.remove();
-    }, [onBackPress])
+    }, [onBackPress]),
   );
 
   const toggleFaq = (id) => {
@@ -74,9 +77,9 @@ const HelpSupportScreen = ({ navigation }) => {
   const handleSendMessage = async () => {
     if (!subject.trim() || !message.trim()) {
       Toast.show({
-        type: 'error',
-        text1: 'Required Fields',
-        text2: 'Please enter both subject and message before sending.',
+        type: "error",
+        text1: "Required Fields",
+        text2: "Please enter both subject and message before sending.",
       });
       return;
     }
@@ -89,22 +92,23 @@ const HelpSupportScreen = ({ navigation }) => {
       });
 
       Toast.show({
-        type: 'success',
-        text1: 'Message Sent!',
-        text2: 'Thank you for reaching out. Our support team will reply shortly.',
+        type: "success",
+        text1: "Message Sent!",
+        text2:
+          "Thank you for reaching out. Our support team will reply shortly.",
       });
 
-      setSubject('');
-      setMessage('');
+      setSubject("");
+      setMessage("");
     } catch (err) {
       const msg =
         err?.response?.data?.error ||
         err?.response?.data?.message ||
-        'Could not send your message. Please try again.';
+        "Could not send your message. Please try again.";
 
       Toast.show({
-        type: 'error',
-        text1: 'Send Failed',
+        type: "error",
+        text1: "Send Failed",
         text2: msg,
       });
     } finally {
@@ -113,18 +117,24 @@ const HelpSupportScreen = ({ navigation }) => {
   };
 
   const handleEmailSupport = () => {
-    Linking.openURL('mailto:support@ugolf.com?subject=UGolf%20Support%20Inquiry').catch(() => {
+    Linking.openURL(
+      "mailto:support@ugolf.com?subject=UGolf%20Support%20Inquiry",
+    ).catch(() => {
       Toast.show({
-        type: 'info',
-        text1: 'Support Email',
-        text2: 'Reach us at support@ugolf.com',
+        type: "info",
+        text1: "Support Email",
+        text2: "Reach us at support@ugolf.com",
       });
     });
   };
 
   return (
-    <SafeAreaView style={styles.container} edges={['bottom']}>
-      <StatusBar translucent backgroundColor="transparent" barStyle="dark-content" />
+    <SafeAreaView style={styles.container} edges={["bottom"]}>
+      <StatusBar
+        translucent
+        backgroundColor="transparent"
+        barStyle="dark-content"
+      />
 
       {/* Header Row */}
       <View style={styles.headerRow}>
@@ -133,14 +143,20 @@ const HelpSupportScreen = ({ navigation }) => {
           onPress={() => navigation.goBack()}
           activeOpacity={0.7}
         >
-          <AuthIcon name="chevron-left" size={moderateScale(22)} color="#093A24" />
+          <AuthIcon
+            name="chevron-left"
+            size={moderateScale(22)}
+            color="#093A24"
+          />
         </TouchableOpacity>
       </View>
 
       {/* Title Container */}
       <View style={styles.titleContainer}>
         <Text style={styles.mainTitle}>Help & Support</Text>
-        <Text style={styles.subtitle}>Have questions? We are here to assist you 24/7</Text>
+        <Text style={styles.subtitle}>
+          Have questions? We are here to assist you 24/7
+        </Text>
       </View>
 
       {/* Main Content */}
@@ -152,7 +168,11 @@ const HelpSupportScreen = ({ navigation }) => {
       >
         {/* Contact Method Cards */}
         <View style={styles.contactRow}>
-          <TouchableOpacity style={styles.contactCard} onPress={handleEmailSupport} activeOpacity={0.85}>
+          <TouchableOpacity
+            style={styles.contactCard}
+            onPress={handleEmailSupport}
+            activeOpacity={0.85}
+          >
             <View style={styles.contactIconCircle}>
               <AuthIcon name="mail" size={moderateScale(20)} color="#093A24" />
             </View>
@@ -160,6 +180,8 @@ const HelpSupportScreen = ({ navigation }) => {
             <Text style={styles.contactCardSub}>support@ugolf.com</Text>
           </TouchableOpacity>
 
+          {/* Live Chat (Commented out for future use) */}
+          {/*
           <TouchableOpacity
             style={styles.contactCard}
             onPress={() =>
@@ -177,10 +199,13 @@ const HelpSupportScreen = ({ navigation }) => {
             <Text style={styles.contactCardTitle}>Live Chat</Text>
             <Text style={styles.contactCardSub}>Available 24/7</Text>
           </TouchableOpacity>
+          */}
         </View>
 
         {/* FAQs Section */}
-        <Text style={styles.sectionHeaderTitle}>Frequently Asked Questions</Text>
+        <Text style={styles.sectionHeaderTitle}>
+          Frequently Asked Questions
+        </Text>
 
         {FAQ_LIST.map((faq) => {
           const isExpanded = expandedFaq === faq.id;
@@ -193,12 +218,14 @@ const HelpSupportScreen = ({ navigation }) => {
               >
                 <Text style={styles.faqQuestion}>{faq.question}</Text>
                 <AuthIcon
-                  name={isExpanded ? 'chevron-up' : 'chevron-down'}
+                  name={isExpanded ? "chevron-up" : "chevron-down"}
                   size={moderateScale(18)}
                   color="#093A24"
                 />
               </TouchableOpacity>
-              {isExpanded ? <Text style={styles.faqAnswer}>{faq.answer}</Text> : null}
+              {isExpanded ? (
+                <Text style={styles.faqAnswer}>{faq.answer}</Text>
+              ) : null}
             </View>
           );
         })}
@@ -247,11 +274,11 @@ const HelpSupportScreen = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F8FAF9',
+    backgroundColor: "#F8FAF9",
   },
   headerRow: {
     paddingHorizontal: wp(5),
-    paddingTop: Platform.OS === 'ios' ? hp(6) : hp(4.5),
+    paddingTop: Platform.OS === "ios" ? hp(6) : hp(4.5),
     paddingBottom: hp(1),
   },
   backButtonCircle: {
@@ -259,10 +286,10 @@ const styles = StyleSheet.create({
     height: moderateScale(42),
     borderRadius: moderateScale(21),
     backgroundColor: COLORS.white,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: "#E2E8F0",
     elevation: 3,
     shadowColor: COLORS.black,
     shadowOffset: { width: 0, height: 2 },
@@ -276,12 +303,12 @@ const styles = StyleSheet.create({
   mainTitle: {
     fontFamily: FONTS.bold,
     fontSize: fontSize(26),
-    color: '#093A24',
+    color: "#093A24",
   },
   subtitle: {
     fontFamily: FONTS.medium,
     fontSize: fontSize(13),
-    color: '#718096',
+    color: "#718096",
     marginTop: hp(0.4),
   },
   scroll: {
@@ -294,7 +321,7 @@ const styles = StyleSheet.create({
 
   // Contact Row
   contactRow: {
-    flexDirection: 'row',
+    flexDirection: "row",
     gap: wp(3),
     marginBottom: hp(2.5),
   },
@@ -302,11 +329,11 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: COLORS.white,
     borderWidth: 1.5,
-    borderColor: '#E2E8F0',
+    borderColor: "#E2E8F0",
     borderRadius: moderateScale(20),
     padding: moderateScale(14),
-    alignItems: 'center',
-    shadowColor: '#000',
+    alignItems: "center",
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 3 },
     shadowOpacity: 0.03,
     shadowRadius: 6,
@@ -316,20 +343,20 @@ const styles = StyleSheet.create({
     width: moderateScale(42),
     height: moderateScale(42),
     borderRadius: moderateScale(21),
-    backgroundColor: '#EFF7F2',
-    justifyContent: 'center',
-    alignItems: 'center',
+    backgroundColor: "#EFF7F2",
+    justifyContent: "center",
+    alignItems: "center",
     marginBottom: hp(1),
   },
   contactCardTitle: {
     fontFamily: FONTS.bold,
     fontSize: fontSize(13.5),
-    color: '#093A24',
+    color: "#093A24",
   },
   contactCardSub: {
     fontFamily: FONTS.medium,
     fontSize: fontSize(11),
-    color: '#718096',
+    color: "#718096",
     marginTop: hp(0.3),
   },
 
@@ -337,7 +364,7 @@ const styles = StyleSheet.create({
   sectionHeaderTitle: {
     fontFamily: FONTS.bold,
     fontSize: fontSize(16),
-    color: '#093A24',
+    color: "#093A24",
     marginBottom: hp(1.5),
     marginTop: hp(1),
   },
@@ -346,28 +373,28 @@ const styles = StyleSheet.create({
   faqCard: {
     backgroundColor: COLORS.white,
     borderWidth: 1.5,
-    borderColor: '#E2E8F0',
+    borderColor: "#E2E8F0",
     borderRadius: moderateScale(16),
     paddingHorizontal: wp(4),
     paddingVertical: hp(1.6),
     marginBottom: hp(1.2),
   },
   faqHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
   },
   faqQuestion: {
     fontFamily: FONTS.bold,
     fontSize: fontSize(13.5),
-    color: '#093A24',
+    color: "#093A24",
     flex: 1,
     marginRight: wp(2),
   },
   faqAnswer: {
     fontFamily: FONTS.medium,
     fontSize: fontSize(12.5),
-    color: '#4A5568',
+    color: "#4A5568",
     marginTop: hp(1),
     lineHeight: fontSize(18),
   },
@@ -376,10 +403,10 @@ const styles = StyleSheet.create({
   messageFormCard: {
     backgroundColor: COLORS.white,
     borderWidth: 1.5,
-    borderColor: '#E2E8F0',
+    borderColor: "#E2E8F0",
     borderRadius: moderateScale(20),
     padding: moderateScale(16),
-    shadowColor: '#000',
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 3 },
     shadowOpacity: 0.03,
     shadowRadius: 6,
@@ -388,40 +415,40 @@ const styles = StyleSheet.create({
   formLabel: {
     fontFamily: FONTS.bold,
     fontSize: fontSize(13),
-    color: '#093A24',
+    color: "#093A24",
     marginBottom: hp(0.6),
     marginTop: hp(0.5),
   },
   formInputWrapper: {
     borderWidth: 1.5,
-    borderColor: '#E2E8F0',
+    borderColor: "#E2E8F0",
     borderRadius: moderateScale(14),
-    backgroundColor: '#F8FAF9',
+    backgroundColor: "#F8FAF9",
     paddingHorizontal: wp(3.5),
     height: hp(5.8),
-    justifyContent: 'center',
+    justifyContent: "center",
     marginBottom: hp(1.5),
   },
   formInput: {
     fontFamily: FONTS.medium,
     fontSize: fontSize(13.5),
-    color: '#093A24',
+    color: "#093A24",
     padding: 0,
   },
   multilineWrapper: {
     height: hp(12),
     paddingVertical: hp(1),
-    justifyContent: 'flex-start',
+    justifyContent: "flex-start",
   },
   multilineInput: {
-    textAlignVertical: 'top',
+    textAlignVertical: "top",
   },
   sendBtn: {
-    backgroundColor: '#093A24',
+    backgroundColor: "#093A24",
     borderRadius: moderateScale(25),
     height: hp(6),
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
     marginTop: hp(1),
   },
   sendBtnText: {
