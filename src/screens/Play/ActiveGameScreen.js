@@ -1616,6 +1616,9 @@ const ActiveGameScreen = ({ navigation, route }) => {
   const [hiddenQuestionCount, setHiddenQuestionCount] = useState(0);
   const [allowNo, setAllowNo] = useState(true);
   const [instructionText, setInstructionText] = useState('');
+  const [noneOfTheseLabel, setNoneOfTheseLabel] = useState(
+    'None of these — play another shot',
+  );
   const [mapData, setMapData] = useState(emptyMap);
   const [playMeta, setPlayMeta] = useState({
     tournamentName: tournament?.title || tournament?.name || 'Tournament',
@@ -1704,6 +1707,11 @@ const ActiveGameScreen = ({ navigation, route }) => {
       }
       if (playData.prompt) setPromptText(playData.prompt);
       setInstructionText(playData.instructionText ?? '');
+      if (playData.noneOfTheseLabel) {
+        setNoneOfTheseLabel(playData.noneOfTheseLabel);
+      } else if (playData.answerMode === 'YES_ONLY') {
+        setNoneOfTheseLabel('None of these — play another shot');
+      }
 
       setPlayMeta((prev) => ({
         tournamentName:
@@ -2093,7 +2101,7 @@ const ActiveGameScreen = ({ navigation, route }) => {
                     activeOpacity={0.88}
                   >
                     <Text style={styles.noneOfTheseBtnText}>
-                      None of these — play another shot
+                      {noneOfTheseLabel}
                     </Text>
                   </TouchableOpacity>
                 ) : null}

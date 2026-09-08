@@ -1,6 +1,6 @@
 # ninja log v5
 132	43272	8104754092211538	AsyncStorageSpec_autolinked_build/CMakeFiles/react_codegen_AsyncStorageSpec.dir/react/renderer/components/AsyncStorageSpec/Props.cpp.o	8021b32f7e34a053
-2	81	0	D:/Apurv/Projects/Ugolf-Mobile/android/app/.cxx/Debug/73s1h4wo/arm64-v8a/CMakeFiles/cmake.verify_globs	6443c910f885daea
+2	145	0	D:/Apurv/Projects/Ugolf-Mobile/android/app/.cxx/Debug/73s1h4wo/arm64-v8a/CMakeFiles/cmake.verify_globs	6443c910f885daea
 16253	61399	8104754269178148	rnmapbox_maps_specs_autolinked_build/CMakeFiles/react_codegen_rnmapbox_maps_specs.dir/react/renderer/components/rnmapbox_maps_specs/Props.cpp.o	ee0053e31821fee1
 85126	91394	8104754574542036	rnscreens_autolinked_build/CMakeFiles/react_codegen_rnscreens.dir/e3fcd9b2fbc14bd17496e4beb3658703/source/codegen/jni/react/renderer/components/rnscreens/States.cpp.o	a132eced5ddacf20
 159	16482	8104753819935218	AsyncStorageSpec_autolinked_build/CMakeFiles/react_codegen_AsyncStorageSpec.dir/react/renderer/components/AsyncStorageSpec/States.cpp.o	a7e8cdd368f67580
@@ -113,4 +113,4 @@
 126301	128929	8104754950391968	D:/Apurv/Projects/Ugolf-Mobile/android/app/build/intermediates/cxx/Debug/73s1h4wo/obj/arm64-v8a/libreact_codegen_rnsvg.so	95cdad2e0119fca4
 126816	133549	8104754996088462	D:/Apurv/Projects/Ugolf-Mobile/android/app/build/intermediates/cxx/Debug/73s1h4wo/obj/arm64-v8a/libreact_codegen_rnscreens.so	8700ad2400c6767
 146429	155105	8104755211498300	D:/Apurv/Projects/Ugolf-Mobile/android/app/build/intermediates/cxx/Debug/73s1h4wo/obj/arm64-v8a/libappmodules.so	8d378c0535e0be09
-3	94	0	D:/Apurv/Projects/Ugolf-Mobile/android/app/.cxx/Debug/73s1h4wo/arm64-v8a/CMakeFiles/cmake.verify_globs	6443c910f885daea
+2	131	0	D:/Apurv/Projects/Ugolf-Mobile/android/app/.cxx/Debug/73s1h4wo/arm64-v8a/CMakeFiles/cmake.verify_globs	6443c910f885daea
