@@ -1570,6 +1570,7 @@ import {
   confirmInstructionSessionApi,
   backSessionStepApi,
 } from '../../services/playService';
+import { formatPlayLocationLabel } from '../../utils/playLocationLabel';
 
 const trophyImg = require('../../assets/Images/ trophy.png');
 
@@ -1606,6 +1607,7 @@ const ActiveGameScreen = ({ navigation, route }) => {
   const [shotNumber, setShotNumber] = useState(1);
   const [score, setScore] = useState(0);
   const [originLocation, setOriginLocation] = useState('TEE');
+  const [locationLabel, setLocationLabel] = useState('Tee');
   const [promptText, setPromptText] = useState('After playing your shot…');
   const [questionText, setQuestionText] = useState('');
   const [activeQuestionId, setActiveQuestionId] = useState('');
@@ -1690,8 +1692,18 @@ const ActiveGameScreen = ({ navigation, route }) => {
       if (sc != null) setScore(sc);
 
       if (playData.currentOrigin) setOriginLocation(playData.currentOrigin);
+      if (playData.locationLabel != null) {
+        setLocationLabel(playData.locationLabel);
+      } else if (playData.currentOrigin || par != null) {
+        setLocationLabel(
+          formatPlayLocationLabel({
+            currentOrigin: playData.currentOrigin || 'TEE',
+            currentPar: par ?? parValue,
+          }),
+        );
+      }
       if (playData.prompt) setPromptText(playData.prompt);
-      if (playData.instructionText != null) setInstructionText(playData.instructionText);
+      setInstructionText(playData.instructionText ?? '');
 
       setPlayMeta((prev) => ({
         tournamentName:
@@ -1768,7 +1780,7 @@ const ActiveGameScreen = ({ navigation, route }) => {
         setShowGameEndModal(true);
       }
     },
-    [activeSessionId, tournament, holeNumber, shotNumber, originLocation],
+    [activeSessionId, tournament, holeNumber, shotNumber, originLocation, parValue],
   );
 
   const runPlayAction = async (fn) => {
@@ -1854,8 +1866,51 @@ const ActiveGameScreen = ({ navigation, route }) => {
     );
   };
 
-  const handleAnswerNo = () => {
-    runPlayAction(() => answerNoSessionApi(tournamentId, activeSessionId, {}));
+  const handleAnswerNo = async () => {
+    if (!canCallSessionApi) {
+      Toast.show({
+        type: 'error',
+        text1: 'Session unavailable',
+        text2: 'Start the game again from Game Rules.',
+      });
+      return;
+    }
+    const prevShot = shotNumber;
+    try {
+      setActionLoading(true);
+      const res = await answerNoSessionApi(tournamentId, activeSessionId, {});
+      parseSessionState(res);
+      const playData = res?.play || res?.session || res?.gameSession || res;
+      const newShot = playData?.currentShot ?? playData?.shotNumber;
+      if (
+        playData?.screen === 'QUESTIONS' &&
+        newShot != null &&
+        Number(newShot) > Number(prevShot)
+      ) {
+        const loc = formatPlayLocationLabel({
+          locationLabel: playData.locationLabel,
+          currentOrigin: playData.currentOrigin || originLocation,
+          currentPar: playData.currentPar ?? parValue,
+        });
+        Toast.show({
+          type: 'info',
+          text1: `Shot ${newShot}`,
+          text2:
+            loc === 'Tee'
+              ? 'Play again from the tee.'
+              : `Play again from ${loc}.`,
+        });
+      }
+    } catch (err) {
+      if (err?.response?.status === 401) return;
+      const backendMsg =
+        err?.response?.data?.error ||
+        err?.response?.data?.message ||
+        'Could not update play state.';
+      Toast.show({ type: 'error', text1: 'Action Failed', text2: backendMsg });
+    } finally {
+      setActionLoading(false);
+    }
   };
 
   const handleConfirmInstruction = () => {
@@ -1917,18 +1972,22 @@ const ActiveGameScreen = ({ navigation, route }) => {
     .filter(Boolean)
     .join(' · ');
 
-  const formatLocation = (loc) => {
-    if (!loc) return 'TEE';
-    const clean = String(loc).replace('_', ' ');
-    if (clean.length > 11) return clean.slice(0, 10) + '…';
-    return clean;
-  };
+  const displayLocation = formatPlayLocationLabel({
+    locationLabel,
+    currentOrigin: originLocation,
+    currentPar: parValue,
+  });
+
+  const questionSectionLabel =
+    playScreen === 'INSTRUCTION'
+      ? 'Instruction'
+      : promptText || displayLocation;
 
   const statPills = [
     { icon: 'award', label: 'HOLE', value: holeNumber },
     { icon: 'book', label: 'PAR', value: parValue },
     { icon: 'trending-up', label: 'SHOT', value: shotNumber },
-    { icon: 'shield', label: 'LOCATION', value: formatLocation(originLocation) },
+    { icon: 'shield', label: 'LOCATION', value: displayLocation },
   ];
 
   return (
@@ -2005,7 +2064,7 @@ const ActiveGameScreen = ({ navigation, route }) => {
         {playScreen === 'QUESTIONS' && questionList.length > 0 ? (
           <>
             <Text style={styles.questionSectionHeader}>
-              {promptText || 'After playing your shot…'}
+              {questionSectionLabel}
             </Text>
 
             {answerMode === 'YES_ONLY' ? (
@@ -2074,7 +2133,9 @@ const ActiveGameScreen = ({ navigation, route }) => {
 
         {playScreen === 'QUESTIONS' && questionList.length === 0 ? (
           <>
-            <Text style={styles.questionSectionHeader}>{promptText || 'Question'}</Text>
+            <Text style={styles.questionSectionHeader}>
+              {promptText || displayLocation}
+            </Text>
             <View style={styles.questionCard}>
               <Text style={styles.questionText}>No question here</Text>
               <Text style={styles.noQuestionDescription}>
@@ -2425,6 +2486,21 @@ const styles = StyleSheet.create({
     color: '#718096',
     lineHeight: fontSize(17),
     marginBottom: hp(1.2),
+  },
+  stageInstructionBanner: {
+    marginBottom: hp(1.2),
+    paddingHorizontal: wp(3.5),
+    paddingVertical: hp(1.2),
+    borderRadius: moderateScale(10),
+    backgroundColor: 'rgba(188, 255, 0, 0.12)',
+    borderWidth: 1,
+    borderColor: 'rgba(188, 255, 0, 0.35)',
+  },
+  stageInstructionText: {
+    fontFamily: FONTS.medium,
+    fontSize: fontSize(13),
+    color: '#2EA200',
+    lineHeight: fontSize(19),
   },
   questionHeaderWrap: {
     marginBottom: hp(1.2),
