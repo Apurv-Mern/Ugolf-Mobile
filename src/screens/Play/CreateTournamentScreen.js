@@ -1273,34 +1273,38 @@ const CreateTournamentScreen = ({ navigation, route }) => {
         </TouchableOpacity>
         */}
 
-        {/* Checkbox Rows */}
-        <TouchableOpacity
-          style={[styles.checkboxOptionRow, { marginTop: hp(1.5) }]}
-          onPress={() => setAllowInvites(!allowInvites)}
-          activeOpacity={0.7}
-        >
-          <View style={[styles.checkboxBox, allowInvites && styles.checkboxBoxChecked]}>
-            {allowInvites && <AuthIcon name="check" size={moderateScale(12)} color={COLORS.white} />}
-          </View>
-          <View style={styles.checkboxTextContainer}>
-            <Text style={styles.checkboxTitleText}>Allow invites</Text>
-            <Text style={styles.checkboxSubText}>Send invites to players or teams</Text>
-          </View>
-        </TouchableOpacity>
+        {/* Checkbox Rows - Hidden for Practice tournament mode (P2P), visible only in Challenge mode */}
+        {isChallengeMode ? (
+          <>
+            <TouchableOpacity
+              style={[styles.checkboxOptionRow, { marginTop: hp(1.5) }]}
+              onPress={() => setAllowInvites(!allowInvites)}
+              activeOpacity={0.7}
+            >
+              <View style={[styles.checkboxBox, allowInvites && styles.checkboxBoxChecked]}>
+                {allowInvites && <AuthIcon name="check" size={moderateScale(12)} color={COLORS.white} />}
+              </View>
+              <View style={styles.checkboxTextContainer}>
+                <Text style={styles.checkboxTitleText}>Allow invites</Text>
+                <Text style={styles.checkboxSubText}>Send invites to players or teams</Text>
+              </View>
+            </TouchableOpacity>
 
-        <TouchableOpacity
-          style={styles.checkboxOptionRow}
-          onPress={() => setShareLink(!shareLink)}
-          activeOpacity={0.7}
-        >
-          <View style={[styles.checkboxBox, shareLink && styles.checkboxBoxChecked]}>
-            {shareLink && <AuthIcon name="check" size={moderateScale(12)} color={COLORS.white} />}
-          </View>
-          <View style={styles.checkboxTextContainer}>
-            <Text style={styles.checkboxTitleText}>Share link</Text>
-            <Text style={styles.checkboxSubText}>Generate a join URL (shown after create)</Text>
-          </View>
-        </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.checkboxOptionRow}
+              onPress={() => setShareLink(!shareLink)}
+              activeOpacity={0.7}
+            >
+              <View style={[styles.checkboxBox, shareLink && styles.checkboxBoxChecked]}>
+                {shareLink && <AuthIcon name="check" size={moderateScale(12)} color={COLORS.white} />}
+              </View>
+              <View style={styles.checkboxTextContainer}>
+                <Text style={styles.checkboxTitleText}>Share link</Text>
+                <Text style={styles.checkboxSubText}>Generate a join URL (shown after create)</Text>
+              </View>
+            </TouchableOpacity>
+          </>
+        ) : null}
 
         {isChallengeMode ? (
           <>

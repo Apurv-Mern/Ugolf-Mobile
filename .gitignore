@@ -133,3 +133,6 @@ ios/fastlane/report.xml
 ios/fastlane/Preview.html
 ios/fastlane/screenshots/
 ios/fastlane/test_output/Archive.zip
+/Archive.zip
+/scratch/
+android/local.properties
