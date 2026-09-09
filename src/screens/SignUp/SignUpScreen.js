@@ -1200,14 +1200,14 @@ const SignUpScreen = ({ navigation }) => {
                 I agree to the{' '}
                 <Text
                   style={styles.termsHighlight}
-                  onPress={() => navigation.navigate('TermsOfService')}
+                  onPress={() => Linking.openURL('https://universalgolf-owner.com/terms-and-conditions.html').catch(() => {})}
                 >
                   Terms of Service
                 </Text>{' '}
                 and{' '}
                 <Text
                   style={styles.termsHighlight}
-                  onPress={() => navigation.navigate('PrivacyPolicy')}
+                  onPress={() => Linking.openURL('https://universalgolf-owner.com/privacy-policy.html').catch(() => {})}
                 >
                   Privacy Policy
                 </Text>{' '}
