@@ -1571,6 +1571,10 @@ import {
   backSessionStepApi,
 } from '../../services/playService';
 import { formatPlayLocationLabel } from '../../utils/playLocationLabel';
+import {
+  isNoneOfTheAboveOption,
+  NONE_OF_THESE_PLAY_ANOTHER_SHOT_LABEL,
+} from '../../utils/shotFlowOptionLabel';
 
 const trophyImg = require('../../assets/Images/ trophy.png');
 
@@ -1761,27 +1765,29 @@ const ActiveGameScreen = ({ navigation, route }) => {
         playData.can_go_back ??
         playData.canStepBack;
 
-      const isSubQuestionScreen = resolvedMode === 'YES_ONLY' || qList.length > 1;
-
-      const startHole = playData.holeStart ?? tournament?.holeStart ?? 1;
-      const currentHoleVal = playData.currentHole ?? playData.holeNumber ?? holeNumber ?? 1;
-      const currentShotVal = playData.currentShot ?? playData.shotNumber ?? shotNumber ?? 1;
-      const currentOriginVal = playData.currentOrigin || originLocation || 'TEE';
-
-      const isAbsoluteFirstStep =
-        !isSubQuestionScreen &&
-        currentHoleVal <= startHole &&
-        currentShotVal <= 1 &&
-        (currentOriginVal === 'TEE' || currentOriginVal === 'TEE_SHOT');
-
-      if (backendCanGoBack === false) {
-        setCanGoBack(false);
-      } else if (isAbsoluteFirstStep) {
-        setCanGoBack(false);
-      } else if (backendCanGoBack === true) {
-        setCanGoBack(true);
+      if (typeof backendCanGoBack === 'boolean') {
+        setCanGoBack(backendCanGoBack);
       } else {
-        setCanGoBack(true);
+        const startHole = playData.holeStart ?? tournament?.holeStart ?? 1;
+        const currentHoleVal = playData.currentHole ?? playData.holeNumber ?? holeNumber ?? 1;
+        const currentShotVal = playData.currentShot ?? playData.shotNumber ?? shotNumber ?? 1;
+        const currentOriginVal = playData.currentOrigin || originLocation || 'TEE';
+        const qList = Array.isArray(playData.questions) ? playData.questions : [];
+        const modeVal = String(playData.answerMode || '').toUpperCase();
+        const resolvedMode =
+          modeVal === 'YES_ONLY' || modeVal === 'YES_NO'
+            ? modeVal
+            : qList.length > 1
+              ? 'YES_ONLY'
+              : 'YES_NO';
+        const isSubQuestionScreen = resolvedMode === 'YES_ONLY' || qList.length > 1;
+        const isAbsoluteFirstStep =
+          screen === 'QUESTIONS' &&
+          !isSubQuestionScreen &&
+          currentHoleVal <= startHole &&
+          currentShotVal <= 1 &&
+          (currentOriginVal === 'TEE' || currentOriginVal === 'TEE_SHOT');
+        setCanGoBack(!isAbsoluteFirstStep);
       }
 
       if (screen === 'FINISHED' || playData.finished || playData.isFinished || playData.status === 'FINISHED') {
@@ -2077,21 +2083,39 @@ const ActiveGameScreen = ({ navigation, route }) => {
 
             {answerMode === 'YES_ONLY' ? (
               <View style={styles.questionCard}>
-                {questionList.map((qItem, idx) => (
-                  <View key={qItem.id || `q-${idx}`} style={styles.yesOnlyGroupWrap}>
-                    <Text style={styles.yesOnlyQuestionText}>
-                      {qItem.text || qItem.question}
-                    </Text>
-                    <TouchableOpacity
-                      style={styles.yesOnlyFullBtn}
-                      onPress={() => handleAnswerYes(qItem.id || qItem._id || qItem.questionId)}
-                      disabled={actionLoading}
-                      activeOpacity={0.85}
-                    >
-                      <Text style={styles.yesOnlyFullBtnText}>YES</Text>
-                    </TouchableOpacity>
-                  </View>
-                ))}
+                {questionList.map((qItem, idx) => {
+                  const qId = qItem.id || qItem._id || qItem.questionId;
+                  if (isNoneOfTheAboveOption(qItem)) {
+                    return (
+                      <TouchableOpacity
+                        key={qId || `q-none-${idx}`}
+                        style={styles.noneOfTheseBtn}
+                        onPress={() => handleAnswerYes(qId)}
+                        disabled={actionLoading}
+                        activeOpacity={0.88}
+                      >
+                        <Text style={styles.noneOfTheseBtnText}>
+                          {NONE_OF_THESE_PLAY_ANOTHER_SHOT_LABEL}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  }
+                  return (
+                    <View key={qId || `q-${idx}`} style={styles.yesOnlyGroupWrap}>
+                      <Text style={styles.yesOnlyQuestionText}>
+                        {qItem.text || qItem.question}
+                      </Text>
+                      <TouchableOpacity
+                        style={styles.yesOnlyFullBtn}
+                        onPress={() => handleAnswerYes(qId)}
+                        disabled={actionLoading}
+                        activeOpacity={0.85}
+                      >
+                        <Text style={styles.yesOnlyFullBtnText}>YES</Text>
+                      </TouchableOpacity>
+                    </View>
+                  );
+                })}
 
                 {allowNo ? (
                   <TouchableOpacity
