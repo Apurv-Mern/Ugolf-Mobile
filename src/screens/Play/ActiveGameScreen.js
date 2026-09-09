@@ -623,10 +623,6 @@
 
 // export default ActiveGameScreen;
 
-
-
-
-
 // import React, { useState, useEffect, useCallback } from 'react';
 // import {
 //   View,
@@ -1531,14 +1527,7 @@
 
 // export default ActiveGameScreen;
 
-
-
-
-
-
-
-
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from "react";
 import {
   View,
   Text,
@@ -1552,15 +1541,15 @@ import {
   ActivityIndicator,
   Alert,
   Modal,
-} from 'react-native';
-import { useFocusEffect } from '@react-navigation/native';
-import Toast from 'react-native-toast-message';
+} from "react-native";
+import { useFocusEffect } from "@react-navigation/native";
+import Toast from "react-native-toast-message";
 
-import AuthIcon from '../../components/common/AuthIcon';
-import HoleMap from '../../components/play/HoleMap';
-import { COLORS } from '../../theme/colors';
-import { FONTS } from '../../theme/fonts';
-import { wp, hp, fontSize, moderateScale } from '../../utils/responsive';
+import AuthIcon from "../../components/common/AuthIcon";
+import HoleMap from "../../components/play/HoleMap";
+import { COLORS } from "../../theme/colors";
+import { FONTS } from "../../theme/fonts";
+import { wp, hp, fontSize, moderateScale } from "../../utils/responsive";
 
 import {
   getGameSessionApi,
@@ -1569,17 +1558,17 @@ import {
   answerNoSessionApi,
   confirmInstructionSessionApi,
   backSessionStepApi,
-} from '../../services/playService';
-import { formatPlayLocationLabel } from '../../utils/playLocationLabel';
+} from "../../services/playService";
+import { formatPlayLocationLabel } from "../../utils/playLocationLabel";
 import {
   isNoneOfTheAboveOption,
   NONE_OF_THESE_PLAY_ANOTHER_SHOT_LABEL,
-} from '../../utils/shotFlowOptionLabel';
+} from "../../utils/shotFlowOptionLabel";
 
-const trophyImg = require('../../assets/Images/ trophy.png');
+const trophyImg = require("../../assets/Images/ trophy.png");
 
 const isUuid = (id) =>
-  typeof id === 'string' &&
+  typeof id === "string" &&
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
 
 const emptyMap = {
@@ -1593,40 +1582,40 @@ const ActiveGameScreen = ({ navigation, route }) => {
   const tournament = route?.params?.tournament;
   const selectedTeam = route?.params?.selectedTeam;
   const players = route?.params?.players;
-  const playModeParam = route?.params?.playMode || 'practice';
+  const playModeParam = route?.params?.playMode || "practice";
   const initialSessionData = route?.params?.initialSessionData;
   const tournamentId = tournament?.id || tournament?._id;
 
   const [activeSessionId, setActiveSessionId] = useState(
     route?.params?.sessionId ||
-    initialSessionData?.play?.sessionId ||
-    initialSessionData?.sessionId ||
-    initialSessionData?.id ||
-    '',
+      initialSessionData?.play?.sessionId ||
+      initialSessionData?.sessionId ||
+      initialSessionData?.id ||
+      "",
   );
 
-  const [playScreen, setPlayScreen] = useState('QUESTIONS'); // QUESTIONS | INSTRUCTION | FINISHED
+  const [playScreen, setPlayScreen] = useState("QUESTIONS"); // QUESTIONS | INSTRUCTION | FINISHED
   const [holeNumber, setHoleNumber] = useState(1);
   const [parValue, setParValue] = useState(4);
   const [shotNumber, setShotNumber] = useState(1);
   const [score, setScore] = useState(0);
-  const [originLocation, setOriginLocation] = useState('TEE');
-  const [locationLabel, setLocationLabel] = useState('Tee');
-  const [promptText, setPromptText] = useState('After playing your shot…');
-  const [questionText, setQuestionText] = useState('');
-  const [activeQuestionId, setActiveQuestionId] = useState('');
+  const [originLocation, setOriginLocation] = useState("TEE");
+  const [locationLabel, setLocationLabel] = useState("Tee");
+  const [promptText, setPromptText] = useState("After playing your shot…");
+  const [questionText, setQuestionText] = useState("");
+  const [activeQuestionId, setActiveQuestionId] = useState("");
   const [questionList, setQuestionList] = useState([]);
-  const [answerMode, setAnswerMode] = useState('YES_NO');
+  const [answerMode, setAnswerMode] = useState("YES_NO");
   const [hiddenQuestionCount, setHiddenQuestionCount] = useState(0);
   const [allowNo, setAllowNo] = useState(true);
-  const [instructionText, setInstructionText] = useState('');
+  const [instructionText, setInstructionText] = useState("");
   const [noneOfTheseLabel, setNoneOfTheseLabel] = useState(
-    'None of these — play another shot',
+    "None of these — play another shot",
   );
   const [mapData, setMapData] = useState(emptyMap);
   const [playMeta, setPlayMeta] = useState({
-    tournamentName: tournament?.title || tournament?.name || 'Tournament',
-    golfCourseName: '',
+    tournamentName: tournament?.title || tournament?.name || "Tournament",
+    golfCourseName: "",
     playMode: String(playModeParam).toUpperCase(),
     gameNumber: route?.params?.gameNumber || 1,
     holeStart: null,
@@ -1648,17 +1637,17 @@ const ActiveGameScreen = ({ navigation, route }) => {
     setShowGameEndModal(false);
     navigation.reset({
       index: 0,
-      routes: [{ name: 'MainApp' }],
+      routes: [{ name: "MainApp" }],
     });
   }, [navigation]);
 
   const confirmLeaveGame = useCallback(() => {
     Alert.alert(
-      'Leave game?',
-      'Are you sure you want to leave this round? You can resume later from Select game.',
+      "Leave game?",
+      "Are you sure you want to leave this round? You can resume later from Select game.",
       [
-        { text: 'Stay', style: 'cancel' },
-        { text: 'Leave', style: 'destructive', onPress: exitToHome },
+        { text: "Stay", style: "cancel" },
+        { text: "Leave", style: "destructive", onPress: exitToHome },
       ],
     );
   }, [exitToHome]);
@@ -1670,7 +1659,10 @@ const ActiveGameScreen = ({ navigation, route }) => {
 
   useFocusEffect(
     useCallback(() => {
-      const subscription = BackHandler.addEventListener('hardwareBackPress', onBackPress);
+      const subscription = BackHandler.addEventListener(
+        "hardwareBackPress",
+        onBackPress,
+      );
       return () => subscription.remove();
     }, [onBackPress]),
   );
@@ -1683,7 +1675,8 @@ const ActiveGameScreen = ({ navigation, route }) => {
       const sId = playData.sessionId || data.sessionId || activeSessionId;
       if (sId) setActiveSessionId(String(sId));
 
-      const screen = playData.screen || (playData.finished ? 'FINISHED' : 'QUESTIONS');
+      const screen =
+        playData.screen || (playData.finished ? "FINISHED" : "QUESTIONS");
       setPlayScreen(screen);
 
       const hole = playData.currentHole ?? playData.holeNumber ?? playData.hole;
@@ -1704,22 +1697,25 @@ const ActiveGameScreen = ({ navigation, route }) => {
       } else if (playData.currentOrigin || par != null) {
         setLocationLabel(
           formatPlayLocationLabel({
-            currentOrigin: playData.currentOrigin || 'TEE',
+            currentOrigin: playData.currentOrigin || "TEE",
             currentPar: par ?? parValue,
           }),
         );
       }
       if (playData.prompt) setPromptText(playData.prompt);
-      setInstructionText(playData.instructionText ?? '');
+      setInstructionText(playData.instructionText ?? "");
       if (playData.noneOfTheseLabel) {
         setNoneOfTheseLabel(playData.noneOfTheseLabel);
-      } else if (playData.answerMode === 'YES_ONLY') {
-        setNoneOfTheseLabel('None of these — play another shot');
+      } else if (playData.answerMode === "YES_ONLY") {
+        setNoneOfTheseLabel("None of these — play another shot");
       }
 
       setPlayMeta((prev) => ({
         tournamentName:
-          playData.tournamentName || tournament?.title || tournament?.name || prev.tournamentName,
+          playData.tournamentName ||
+          tournament?.title ||
+          tournament?.name ||
+          prev.tournamentName,
         golfCourseName: playData.golfCourseName || prev.golfCourseName,
         playMode: playData.playMode || prev.playMode,
         gameNumber: playData.gameNumber ?? prev.gameNumber,
@@ -1727,7 +1723,7 @@ const ActiveGameScreen = ({ navigation, route }) => {
         holeEnd: playData.holeEnd ?? prev.holeEnd,
       }));
 
-      if (playData.map && typeof playData.map === 'object') {
+      if (playData.map && typeof playData.map === "object") {
         setMapData({
           hasGps: !!playData.map.hasGps,
           green: playData.map.green ?? null,
@@ -1739,70 +1735,88 @@ const ActiveGameScreen = ({ navigation, route }) => {
       }
 
       const qList = Array.isArray(playData.questions) ? playData.questions : [];
-      const modeVal = String(playData.answerMode || '').toUpperCase();
+      const modeVal = String(playData.answerMode || "").toUpperCase();
       const resolvedMode =
-        modeVal === 'YES_ONLY' || modeVal === 'YES_NO'
+        modeVal === "YES_ONLY" || modeVal === "YES_NO"
           ? modeVal
           : qList.length > 1
-            ? 'YES_ONLY'
-            : 'YES_NO';
+          ? "YES_ONLY"
+          : "YES_NO";
       setAnswerMode(resolvedMode);
       setQuestionList(qList);
       setHiddenQuestionCount(Number(playData.hiddenQuestionCount) || 0);
-      setAllowNo(playData.allowNo !== false && screen === 'QUESTIONS');
+      setAllowNo(playData.allowNo !== false && screen === "QUESTIONS");
 
       if (qList.length > 0) {
         const first = qList[0];
-        setQuestionText(first.text || first.question || '');
-        setActiveQuestionId(String(first.id || first._id || first.questionId || ''));
+        setQuestionText(first.text || first.question || "");
+        setActiveQuestionId(
+          String(first.id || first._id || first.questionId || ""),
+        );
       } else {
-        setQuestionText('');
-        setActiveQuestionId('');
+        setQuestionText("");
+        setActiveQuestionId("");
       }
 
       const backendCanGoBack =
-        playData.canGoBack ??
-        playData.can_go_back ??
-        playData.canStepBack;
+        playData.canGoBack ?? playData.can_go_back ?? playData.canStepBack;
 
-      if (typeof backendCanGoBack === 'boolean') {
+      if (typeof backendCanGoBack === "boolean") {
         setCanGoBack(backendCanGoBack);
       } else {
         const startHole = playData.holeStart ?? tournament?.holeStart ?? 1;
-        const currentHoleVal = playData.currentHole ?? playData.holeNumber ?? holeNumber ?? 1;
-        const currentShotVal = playData.currentShot ?? playData.shotNumber ?? shotNumber ?? 1;
-        const currentOriginVal = playData.currentOrigin || originLocation || 'TEE';
-        const qList = Array.isArray(playData.questions) ? playData.questions : [];
-        const modeVal = String(playData.answerMode || '').toUpperCase();
+        const currentHoleVal =
+          playData.currentHole ?? playData.holeNumber ?? holeNumber ?? 1;
+        const currentShotVal =
+          playData.currentShot ?? playData.shotNumber ?? shotNumber ?? 1;
+        const currentOriginVal =
+          playData.currentOrigin || originLocation || "TEE";
+        const qList = Array.isArray(playData.questions)
+          ? playData.questions
+          : [];
+        const modeVal = String(playData.answerMode || "").toUpperCase();
         const resolvedMode =
-          modeVal === 'YES_ONLY' || modeVal === 'YES_NO'
+          modeVal === "YES_ONLY" || modeVal === "YES_NO"
             ? modeVal
             : qList.length > 1
-              ? 'YES_ONLY'
-              : 'YES_NO';
-        const isSubQuestionScreen = resolvedMode === 'YES_ONLY' || qList.length > 1;
+            ? "YES_ONLY"
+            : "YES_NO";
+        const isSubQuestionScreen =
+          resolvedMode === "YES_ONLY" || qList.length > 1;
         const isAbsoluteFirstStep =
-          screen === 'QUESTIONS' &&
+          screen === "QUESTIONS" &&
           !isSubQuestionScreen &&
           currentHoleVal <= startHole &&
           currentShotVal <= 1 &&
-          (currentOriginVal === 'TEE' || currentOriginVal === 'TEE_SHOT');
+          (currentOriginVal === "TEE" || currentOriginVal === "TEE_SHOT");
         setCanGoBack(!isAbsoluteFirstStep);
       }
 
-      if (screen === 'FINISHED' || playData.finished || playData.isFinished || playData.status === 'FINISHED') {
+      if (
+        screen === "FINISHED" ||
+        playData.finished ||
+        playData.isFinished ||
+        playData.status === "FINISHED"
+      ) {
         setShowGameEndModal(true);
       }
     },
-    [activeSessionId, tournament, holeNumber, shotNumber, originLocation, parValue],
+    [
+      activeSessionId,
+      tournament,
+      holeNumber,
+      shotNumber,
+      originLocation,
+      parValue,
+    ],
   );
 
   const runPlayAction = async (fn) => {
     if (!canCallSessionApi) {
       Toast.show({
-        type: 'error',
-        text1: 'Session unavailable',
-        text2: 'Start the game again from Game Rules.',
+        type: "error",
+        text1: "Session unavailable",
+        text2: "Start the game again from Game Rules.",
       });
       return;
     }
@@ -1813,8 +1827,10 @@ const ActiveGameScreen = ({ navigation, route }) => {
     } catch (err) {
       if (err?.response?.status === 401) return;
       const backendMsg =
-        err?.response?.data?.error || err?.response?.data?.message || 'Could not update play state.';
-      Toast.show({ type: 'error', text1: 'Action Failed', text2: backendMsg });
+        err?.response?.data?.error ||
+        err?.response?.data?.message ||
+        "Could not update play state.";
+      Toast.show({ type: "error", text1: "Action Failed", text2: backendMsg });
     } finally {
       setActionLoading(false);
     }
@@ -1826,7 +1842,7 @@ const ActiveGameScreen = ({ navigation, route }) => {
       const res = await getGameSessionApi(tournamentId, activeSessionId);
       parseSessionState(res);
     } catch (err) {
-      console.log('Fetch game session error:', err);
+      console.log("Fetch game session error:", err);
     } finally {
       setActionLoading(false);
     }
@@ -1842,7 +1858,7 @@ const ActiveGameScreen = ({ navigation, route }) => {
   }, [tournamentId, activeSessionId]);
 
   useEffect(() => {
-    if (playScreen !== 'FINISHED' && !showGameEndModal) return;
+    if (playScreen !== "FINISHED" && !showGameEndModal) return;
 
     const currentGame = Number(playMeta.gameNumber) || 1;
     const totalGames = Number(tournament?.numberOfGames) || 0;
@@ -1855,23 +1871,30 @@ const ActiveGameScreen = ({ navigation, route }) => {
       .then((res) => {
         if (cancelled) return;
         const data = res?.data || res;
-        const next = data?.nextGameNumber != null ? Number(data.nextGameNumber) : null;
+        const next =
+          data?.nextGameNumber != null ? Number(data.nextGameNumber) : null;
         setNextGameNumber(Number.isFinite(next) ? next : null);
       })
-      .catch(() => { });
+      .catch(() => {});
 
     return () => {
       cancelled = true;
     };
-  }, [playScreen, showGameEndModal, playMeta.gameNumber, tournamentId, tournament?.numberOfGames]);
+  }, [
+    playScreen,
+    showGameEndModal,
+    playMeta.gameNumber,
+    tournamentId,
+    tournament?.numberOfGames,
+  ]);
 
   const handleAnswerYes = (questionId) => {
-    const id = String(questionId || '');
+    const id = String(questionId || "");
     if (!id) {
       Toast.show({
-        type: 'error',
-        text1: 'No question',
-        text2: 'There is no active question to answer Yes.',
+        type: "error",
+        text1: "No question",
+        text2: "There is no active question to answer Yes.",
       });
       return;
     }
@@ -1883,9 +1906,9 @@ const ActiveGameScreen = ({ navigation, route }) => {
   const handleAnswerNo = async () => {
     if (!canCallSessionApi) {
       Toast.show({
-        type: 'error',
-        text1: 'Session unavailable',
-        text2: 'Start the game again from Game Rules.',
+        type: "error",
+        text1: "Session unavailable",
+        text2: "Start the game again from Game Rules.",
       });
       return;
     }
@@ -1897,7 +1920,7 @@ const ActiveGameScreen = ({ navigation, route }) => {
       const playData = res?.play || res?.session || res?.gameSession || res;
       const newShot = playData?.currentShot ?? playData?.shotNumber;
       if (
-        playData?.screen === 'QUESTIONS' &&
+        playData?.screen === "QUESTIONS" &&
         newShot != null &&
         Number(newShot) > Number(prevShot)
       ) {
@@ -1907,11 +1930,11 @@ const ActiveGameScreen = ({ navigation, route }) => {
           currentPar: playData.currentPar ?? parValue,
         });
         Toast.show({
-          type: 'info',
+          type: "info",
           text1: `Shot ${newShot}`,
           text2:
-            loc === 'Tee'
-              ? 'Play again from the tee.'
+            loc === "Tee"
+              ? "Play again from the tee."
               : `Play again from ${loc}.`,
         });
       }
@@ -1920,15 +1943,17 @@ const ActiveGameScreen = ({ navigation, route }) => {
       const backendMsg =
         err?.response?.data?.error ||
         err?.response?.data?.message ||
-        'Could not update play state.';
-      Toast.show({ type: 'error', text1: 'Action Failed', text2: backendMsg });
+        "Could not update play state.";
+      Toast.show({ type: "error", text1: "Action Failed", text2: backendMsg });
     } finally {
       setActionLoading(false);
     }
   };
 
   const handleConfirmInstruction = () => {
-    runPlayAction(() => confirmInstructionSessionApi(tournamentId, activeSessionId));
+    runPlayAction(() =>
+      confirmInstructionSessionApi(tournamentId, activeSessionId),
+    );
   };
 
   const handleBackStep = () => {
@@ -1942,7 +1967,7 @@ const ActiveGameScreen = ({ navigation, route }) => {
 
   const handleCheckScore = () => {
     setShowGameEndModal(false);
-    navigation.navigate('Leaderboard', {
+    navigation.navigate("Leaderboard", {
       tournament,
       selectedTeam,
       players,
@@ -1956,10 +1981,11 @@ const ActiveGameScreen = ({ navigation, route }) => {
     if (nextGameNumber == null) return;
     setShowGameEndModal(false);
     const playMode =
-      String(playModeParam || playMeta.playMode || 'practice').toLowerCase() === 'challenge'
-        ? 'challenge'
-        : 'practice';
-    navigation.replace('SelectGame', {
+      String(playModeParam || playMeta.playMode || "practice").toLowerCase() ===
+      "challenge"
+        ? "challenge"
+        : "practice";
+    navigation.replace("SelectGame", {
       tournament,
       selectedTeam,
       players,
@@ -1976,15 +2002,15 @@ const ActiveGameScreen = ({ navigation, route }) => {
   const holesLabel =
     playMeta.holeStart != null && playMeta.holeEnd != null
       ? `Holes ${playMeta.holeStart}-${playMeta.holeEnd}`
-      : '';
+      : "";
   const subtitle = [
     `Game ${playMeta.gameNumber || 1}`,
-    playMeta.playMode === 'PRACTICE' ? 'Practice' : 'Challenge',
+    playMeta.playMode === "PRACTICE" ? "Practice" : "Challenge",
     playMeta.golfCourseName,
     holesLabel,
   ]
     .filter(Boolean)
-    .join(' · ');
+    .join(" · ");
 
   const displayLocation = formatPlayLocationLabel({
     locationLabel,
@@ -1993,20 +2019,24 @@ const ActiveGameScreen = ({ navigation, route }) => {
   });
 
   const questionSectionLabel =
-    playScreen === 'INSTRUCTION'
-      ? 'Instruction'
+    playScreen === "INSTRUCTION"
+      ? "Instruction"
       : promptText || displayLocation;
 
   const statPills = [
-    { icon: 'award', label: 'HOLE', value: holeNumber },
-    { icon: 'book', label: 'PAR', value: parValue },
-    { icon: 'trending-up', label: 'SHOT', value: shotNumber },
-    { icon: 'shield', label: 'LOCATION', value: displayLocation },
+    { icon: "award", label: "HOLE", value: holeNumber },
+    { icon: "book", label: "PAR", value: parValue },
+    { icon: "trending-up", label: "SHOT", value: shotNumber },
+    { icon: "shield", label: "LOCATION", value: displayLocation },
   ];
 
   return (
     <View style={styles.container}>
-      <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
+      <StatusBar
+        translucent
+        backgroundColor="transparent"
+        barStyle="light-content"
+      />
 
       {/* ── Scroll Content ── */}
       <ScrollView
@@ -2015,7 +2045,11 @@ const ActiveGameScreen = ({ navigation, route }) => {
         showsVerticalScrollIndicator={false}
       >
         {/* ── 1. Trophy Banner Header ── */}
-        <ImageBackground source={trophyImg} style={styles.header} resizeMode="cover">
+        <ImageBackground
+          source={trophyImg}
+          style={styles.header}
+          resizeMode="cover"
+        >
           <View style={styles.headerOverlay} />
 
           <TouchableOpacity
@@ -2023,16 +2057,29 @@ const ActiveGameScreen = ({ navigation, route }) => {
             onPress={confirmLeaveGame}
             activeOpacity={0.7}
           >
-            <AuthIcon name="chevron-left" size={moderateScale(20)} color="#093A24" />
+            <AuthIcon
+              name="chevron-left"
+              size={moderateScale(20)}
+              color="#093A24"
+            />
           </TouchableOpacity>
 
           <Text style={styles.tournamentTitle} numberOfLines={2}>
-            {playMeta.tournamentName || 'Tournament'}
+            {playMeta.tournamentName || "Tournament"}
           </Text>
 
           <View style={styles.subPillBadge}>
-            <Text style={styles.tournamentSub} numberOfLines={1} ellipsizeMode="tail">
-              {subtitle || `Game 1 · ${String(playModeParam).toLowerCase() === 'practice' ? 'Practice' : 'Challenge'}`}
+            <Text
+              style={styles.tournamentSub}
+              numberOfLines={1}
+              ellipsizeMode="tail"
+            >
+              {subtitle ||
+                `Game 1 · ${
+                  String(playModeParam).toLowerCase() === "practice"
+                    ? "Practice"
+                    : "Challenge"
+                }`}
             </Text>
           </View>
         </ImageBackground>
@@ -2042,7 +2089,11 @@ const ActiveGameScreen = ({ navigation, route }) => {
           <View style={styles.pillsRow}>
             {statPills.map((pill) => (
               <View key={pill.label} style={styles.pillItem}>
-                <AuthIcon name={pill.icon} size={moderateScale(12)} color="#093A24" />
+                <AuthIcon
+                  name={pill.icon}
+                  size={moderateScale(12)}
+                  color="#093A24"
+                />
                 <View style={styles.pillTextCol}>
                   <Text style={styles.pillLabel}>{pill.label}</Text>
                   <Text style={styles.pillVal} numberOfLines={1}>
@@ -2075,13 +2126,13 @@ const ActiveGameScreen = ({ navigation, route }) => {
           </View>
         ) : null}
 
-        {playScreen === 'QUESTIONS' && questionList.length > 0 ? (
+        {playScreen === "QUESTIONS" && questionList.length > 0 ? (
           <>
             <Text style={styles.questionSectionHeader}>
               {questionSectionLabel}
             </Text>
 
-            {answerMode === 'YES_ONLY' ? (
+            {answerMode === "YES_ONLY" ? (
               <View style={styles.questionCard}>
                 {questionList.map((qItem, idx) => {
                   const qId = qItem.id || qItem._id || qItem.questionId;
@@ -2101,7 +2152,10 @@ const ActiveGameScreen = ({ navigation, route }) => {
                     );
                   }
                   return (
-                    <View key={qId || `q-${idx}`} style={styles.yesOnlyGroupWrap}>
+                    <View
+                      key={qId || `q-${idx}`}
+                      style={styles.yesOnlyGroupWrap}
+                    >
                       <Text style={styles.yesOnlyQuestionText}>
                         {qItem.text || qItem.question}
                       </Text>
@@ -2133,9 +2187,7 @@ const ActiveGameScreen = ({ navigation, route }) => {
             ) : (
               <View style={styles.questionCard}>
                 {hiddenQuestionCount > 0 ? (
-                  <Text style={styles.hiddenQuestionHint}>
-                    On the green or holed out? Tap No to see those options.
-                  </Text>
+                  <Text style={styles.hiddenQuestionHint}></Text>
                 ) : null}
                 <Text style={styles.questionText}>{questionText}</Text>
                 <View style={styles.yesNoRow}>
@@ -2163,7 +2215,7 @@ const ActiveGameScreen = ({ navigation, route }) => {
           </>
         ) : null}
 
-        {playScreen === 'QUESTIONS' && questionList.length === 0 ? (
+        {playScreen === "QUESTIONS" && questionList.length === 0 ? (
           <>
             <Text style={styles.questionSectionHeader}>
               {promptText || displayLocation}
@@ -2172,7 +2224,7 @@ const ActiveGameScreen = ({ navigation, route }) => {
               <Text style={styles.questionText}>No question here</Text>
               <Text style={styles.noQuestionDescription}>
                 {promptText ||
-                  'No Shot Flow question for this stage. Go back or check Shot Flow.'}
+                  "No Shot Flow question for this stage. Go back or check Shot Flow."}
               </Text>
               {allowNo ? (
                 <TouchableOpacity
@@ -2189,11 +2241,13 @@ const ActiveGameScreen = ({ navigation, route }) => {
         ) : null}
 
         {/* INSTRUCTION SCREEN */}
-        {playScreen === 'INSTRUCTION' ? (
+        {playScreen === "INSTRUCTION" ? (
           <>
             <Text style={styles.questionSectionHeader}>INSTRUCTION</Text>
             <View style={styles.questionCard}>
-              <Text style={styles.questionText}>{instructionText || 'Continue'}</Text>
+              <Text style={styles.questionText}>
+                {instructionText || "Continue"}
+              </Text>
               <TouchableOpacity
                 style={styles.nextShotBtn}
                 onPress={handleConfirmInstruction}
@@ -2207,21 +2261,25 @@ const ActiveGameScreen = ({ navigation, route }) => {
         ) : null}
 
         {/* FINISHED SCREEN */}
-        {playScreen === 'FINISHED' ? (
+        {playScreen === "FINISHED" ? (
           <>
             <Text style={styles.questionSectionHeader}>ROUND COMPLETE</Text>
             <View style={styles.questionCard}>
               <Text style={styles.questionText}>
                 Game {playMeta.gameNumber || 1} complete for this nine.
               </Text>
-              <Text style={styles.finalScoreText}>Your Final score: {score}</Text>
+              <Text style={styles.finalScoreText}>
+                Your Final score: {score}
+              </Text>
               {nextGameNumber != null ? (
                 <TouchableOpacity
                   style={[styles.nextShotBtn, { marginBottom: hp(1.2) }]}
                   onPress={handleStartNextGame}
                   activeOpacity={0.88}
                 >
-                  <Text style={styles.nextShotBtnText}>START GAME {nextGameNumber}</Text>
+                  <Text style={styles.nextShotBtnText}>
+                    START GAME {nextGameNumber}
+                  </Text>
                 </TouchableOpacity>
               ) : null}
               <TouchableOpacity
@@ -2237,7 +2295,7 @@ const ActiveGameScreen = ({ navigation, route }) => {
 
         {/* Bottom Actions Row: BACK ONE STEP + LEAVE */}
         <View style={styles.bottomActionsRow}>
-          {canGoBack && playScreen !== 'FINISHED' ? (
+          {canGoBack && playScreen !== "FINISHED" ? (
             <TouchableOpacity
               style={styles.backStepBtn}
               onPress={handleBackStep}
@@ -2289,7 +2347,9 @@ const ActiveGameScreen = ({ navigation, route }) => {
                 onPress={handleStartNextGame}
                 activeOpacity={0.85}
               >
-                <Text style={styles.modalSolidBtnText}>START GAME {nextGameNumber}</Text>
+                <Text style={styles.modalSolidBtnText}>
+                  START GAME {nextGameNumber}
+                </Text>
               </TouchableOpacity>
             ) : null}
 
@@ -2320,7 +2380,7 @@ const ActiveGameScreen = ({ navigation, route }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F8FAF9',
+    backgroundColor: "#F8FAF9",
   },
   scroll: {
     flex: 1,
@@ -2331,23 +2391,23 @@ const styles = StyleSheet.create({
 
   // ── Header ──
   header: {
-    backgroundColor: '#093A24',
-    paddingTop: Platform.OS === 'ios' ? hp(6.5) : hp(4.5),
+    backgroundColor: "#093A24",
+    paddingTop: Platform.OS === "ios" ? hp(6.5) : hp(4.5),
     paddingHorizontal: wp(5),
     paddingBottom: hp(7),
-    position: 'relative',
+    position: "relative",
   },
   headerOverlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(5, 25, 16, 0.55)',
+    backgroundColor: "rgba(5, 25, 16, 0.55)",
   },
   backButtonCircle: {
     width: moderateScale(38),
     height: moderateScale(38),
     borderRadius: moderateScale(19),
     backgroundColor: COLORS.white,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
     marginBottom: hp(1.5),
     elevation: 4,
     shadowColor: COLORS.black,
@@ -2361,40 +2421,40 @@ const styles = StyleSheet.create({
     fontSize: fontSize(24),
     color: COLORS.white,
     lineHeight: fontSize(30),
-    textShadowColor: 'rgba(0, 0, 0, 0.9)',
+    textShadowColor: "rgba(0, 0, 0, 0.9)",
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 3,
   },
   subPillBadge: {
-    alignSelf: 'flex-start',
-    backgroundColor: 'rgba(5, 25, 16, 0.70)',
+    alignSelf: "flex-start",
+    backgroundColor: "rgba(5, 25, 16, 0.70)",
     borderRadius: moderateScale(10),
     paddingHorizontal: wp(3),
     paddingVertical: hp(0.5),
     marginTop: hp(0.8),
     borderWidth: 1,
-    borderColor: 'rgba(188, 255, 0, 0.35)',
+    borderColor: "rgba(188, 255, 0, 0.35)",
   },
   tournamentSub: {
     fontFamily: FONTS.bold,
     fontSize: fontSize(12),
-    color: '#FFFFFF',
-    textShadowColor: 'rgba(0, 0, 0, 0.9)',
+    color: "#FFFFFF",
+    textShadowColor: "rgba(0, 0, 0, 0.9)",
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 2,
   },
 
   // ── Status Card (floating over header image) ──
   statusCard: {
-    backgroundColor: '#093A24',
+    backgroundColor: "#093A24",
     borderRadius: moderateScale(22),
     paddingHorizontal: wp(4),
     paddingVertical: hp(1.8),
     marginTop: -hp(5),
     marginHorizontal: wp(5),
     borderWidth: 1.5,
-    borderColor: '#BCFF00',
-    shadowColor: '#000',
+    borderColor: "#BCFF00",
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.12,
     shadowRadius: 8,
@@ -2402,15 +2462,15 @@ const styles = StyleSheet.create({
     zIndex: 10,
   },
   pillsRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    justifyContent: "space-between",
     gap: wp(1.5),
     marginBottom: hp(1.2),
   },
   pillItem: {
     flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     backgroundColor: COLORS.white,
     borderRadius: moderateScale(12),
     paddingHorizontal: wp(2),
@@ -2423,12 +2483,12 @@ const styles = StyleSheet.create({
   pillLabel: {
     fontFamily: FONTS.bold,
     fontSize: fontSize(8),
-    color: '#093A24',
+    color: "#093A24",
   },
   pillVal: {
     fontFamily: FONTS.bold,
     fontSize: fontSize(13),
-    color: '#093A24',
+    color: "#093A24",
   },
   scoreNumber: {
     fontFamily: FONTS.bold,
@@ -2439,7 +2499,7 @@ const styles = StyleSheet.create({
   scoreLabel: {
     fontFamily: FONTS.medium,
     fontSize: fontSize(12),
-    color: 'rgba(255, 255, 255, 0.75)',
+    color: "rgba(255, 255, 255, 0.75)",
   },
 
   // ── Map Section ──
@@ -2450,28 +2510,28 @@ const styles = StyleSheet.create({
   mapSectionTitle: {
     fontFamily: FONTS.bold,
     fontSize: fontSize(16),
-    color: '#093A24',
+    color: "#093A24",
   },
   mapWarningText: {
     fontFamily: FONTS.medium,
     fontSize: fontSize(11),
-    color: '#E53E3E',
+    color: "#E53E3E",
     marginTop: hp(0.3),
     marginBottom: hp(0.5),
   },
   mapCard: {
     borderRadius: moderateScale(20),
-    overflow: 'hidden',
+    overflow: "hidden",
     minHeight: hp(22),
     borderWidth: 1.5,
-    borderColor: '#E2E8F0',
+    borderColor: "#E2E8F0",
     marginTop: hp(1),
   },
 
   // ── Loading ──
   loadingRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: wp(2),
     paddingHorizontal: wp(5),
     marginTop: hp(1.5),
@@ -2479,14 +2539,14 @@ const styles = StyleSheet.create({
   loadingText: {
     fontFamily: FONTS.medium,
     fontSize: fontSize(12),
-    color: '#718096',
+    color: "#718096",
   },
 
   // ── Question Card ──
   questionSectionHeader: {
     fontFamily: FONTS.medium,
     fontSize: fontSize(12),
-    color: '#718096',
+    color: "#718096",
     paddingHorizontal: wp(5),
     marginTop: hp(2),
     marginBottom: hp(0.8),
@@ -2494,12 +2554,12 @@ const styles = StyleSheet.create({
   questionCard: {
     backgroundColor: COLORS.white,
     borderWidth: 1.5,
-    borderColor: '#E2E8F0',
+    borderColor: "#E2E8F0",
     borderRadius: moderateScale(22),
     paddingHorizontal: wp(5),
     paddingVertical: hp(2),
     marginHorizontal: wp(5),
-    shadowColor: '#000',
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 3 },
     shadowOpacity: 0.03,
     shadowRadius: 6,
@@ -2508,14 +2568,14 @@ const styles = StyleSheet.create({
   questionText: {
     fontFamily: FONTS.medium,
     fontSize: fontSize(13.5),
-    color: '#093A24',
+    color: "#093A24",
     marginBottom: hp(1.2),
     lineHeight: fontSize(20),
   },
   hiddenQuestionHint: {
     fontFamily: FONTS.medium,
     fontSize: fontSize(12),
-    color: '#718096',
+    color: "#718096",
     lineHeight: fontSize(17),
     marginBottom: hp(1.2),
   },
@@ -2524,27 +2584,27 @@ const styles = StyleSheet.create({
     paddingHorizontal: wp(3.5),
     paddingVertical: hp(1.2),
     borderRadius: moderateScale(10),
-    backgroundColor: 'rgba(188, 255, 0, 0.12)',
+    backgroundColor: "rgba(188, 255, 0, 0.12)",
     borderWidth: 1,
-    borderColor: 'rgba(188, 255, 0, 0.35)',
+    borderColor: "rgba(188, 255, 0, 0.35)",
   },
   stageInstructionText: {
     fontFamily: FONTS.medium,
     fontSize: fontSize(13),
-    color: '#2EA200',
+    color: "#2EA200",
     lineHeight: fontSize(19),
   },
   questionHeaderWrap: {
     marginBottom: hp(1.2),
   },
   requiredStar: {
-    color: '#E53E3E',
+    color: "#E53E3E",
     fontFamily: FONTS.bold,
   },
   multiInstructionText: {
     fontFamily: FONTS.bold,
     fontSize: fontSize(11.5),
-    color: '#2EA200',
+    color: "#2EA200",
     marginTop: hp(0.2),
     marginBottom: hp(0.5),
   },
@@ -2552,28 +2612,28 @@ const styles = StyleSheet.create({
     marginTop: hp(0.8),
   },
   optionRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#F8FAF9',
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#F8FAF9",
     borderWidth: 1.5,
-    borderColor: '#E2E8F0',
+    borderColor: "#E2E8F0",
     borderRadius: moderateScale(16),
     paddingHorizontal: wp(3.5),
     paddingVertical: hp(1.2),
     marginBottom: hp(1.2),
   },
   optionRowSelected: {
-    borderColor: '#093A24',
-    backgroundColor: '#F0FFF4',
+    borderColor: "#093A24",
+    backgroundColor: "#F0FFF4",
   },
   checkboxSquare: {
     width: moderateScale(20),
     height: moderateScale(20),
     borderRadius: moderateScale(5),
     borderWidth: 2,
-    borderColor: '#718096',
-    justifyContent: 'center',
-    alignItems: 'center',
+    borderColor: "#718096",
+    justifyContent: "center",
+    alignItems: "center",
     marginRight: wp(3),
     backgroundColor: COLORS.white,
   },
@@ -2582,39 +2642,39 @@ const styles = StyleSheet.create({
     height: moderateScale(20),
     borderRadius: moderateScale(10),
     borderWidth: 2,
-    borderColor: '#718096',
-    justifyContent: 'center',
-    alignItems: 'center',
+    borderColor: "#718096",
+    justifyContent: "center",
+    alignItems: "center",
     marginRight: wp(3),
     backgroundColor: COLORS.white,
   },
   optionControlSelected: {
-    borderColor: '#093A24',
-    backgroundColor: '#BCFF00',
+    borderColor: "#093A24",
+    backgroundColor: "#BCFF00",
   },
   optionText: {
     fontFamily: FONTS.medium,
     fontSize: fontSize(13.5),
-    color: '#093A24',
+    color: "#093A24",
     flex: 1,
   },
   optionTextSelected: {
     fontFamily: FONTS.bold,
-    color: '#093A24',
+    color: "#093A24",
   },
   submitAnswerBtn: {
-    backgroundColor: '#BCFF00',
+    backgroundColor: "#BCFF00",
     borderRadius: moderateScale(20),
     minHeight: hp(5.2),
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
     marginTop: hp(1),
     elevation: 3,
   },
   submitAnswerBtnText: {
     fontFamily: FONTS.bold,
     fontSize: fontSize(13),
-    color: '#093A24',
+    color: "#093A24",
     letterSpacing: 0.5,
   },
   yesNoContainer: {
@@ -2622,88 +2682,88 @@ const styles = StyleSheet.create({
   },
   yesBtnSelected: {
     borderWidth: 2,
-    borderColor: '#093A24',
+    borderColor: "#093A24",
   },
   yesBtnTextSelected: {
     fontFamily: FONTS.bold,
   },
   noBtnSelected: {
-    backgroundColor: '#093A24',
+    backgroundColor: "#093A24",
   },
   noBtnTextSelected: {
-    color: '#BCFF00',
+    color: "#BCFF00",
   },
   noQuestionDescription: {
     fontFamily: FONTS.medium,
     fontSize: fontSize(12.5),
-    color: '#718096',
+    color: "#718096",
     marginBottom: hp(1.5),
     lineHeight: fontSize(18),
   },
   yesNoRow: {
-    flexDirection: 'row',
-    alignItems: 'stretch',
+    flexDirection: "row",
+    alignItems: "stretch",
     gap: wp(3),
   },
   yesBtn: {
     flex: 1,
-    backgroundColor: '#BCFF00',
+    backgroundColor: "#BCFF00",
     borderRadius: moderateScale(20),
     paddingHorizontal: wp(3),
     paddingVertical: hp(1.4),
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
   },
   yesBtnText: {
     fontFamily: FONTS.bold,
     fontSize: fontSize(13),
-    color: '#093A24',
-    textAlign: 'center',
+    color: "#093A24",
+    textAlign: "center",
   },
   noBtn: {
     flex: 1,
     backgroundColor: COLORS.white,
     borderWidth: 1.5,
-    borderColor: '#093A24',
+    borderColor: "#093A24",
     borderRadius: moderateScale(20),
     paddingHorizontal: wp(3),
     paddingVertical: hp(1.4),
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
   },
   noBtnText: {
     fontFamily: FONTS.bold,
     fontSize: fontSize(12.5),
-    color: '#093A24',
-    textAlign: 'center',
+    color: "#093A24",
+    textAlign: "center",
   },
   nextShotBtn: {
-    backgroundColor: '#BCFF00',
+    backgroundColor: "#BCFF00",
     borderRadius: moderateScale(24),
     minHeight: hp(5.8),
     paddingHorizontal: wp(4),
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
     elevation: 3,
   },
   nextShotBtnText: {
     fontFamily: FONTS.bold,
     fontSize: fontSize(13.5),
-    color: '#093A24',
+    color: "#093A24",
     letterSpacing: 0.5,
-    textAlign: 'center',
+    textAlign: "center",
   },
   finalScoreText: {
     fontFamily: FONTS.bold,
     fontSize: fontSize(14.5),
-    color: '#2EA200',
+    color: "#2EA200",
     marginTop: hp(0.5),
     marginBottom: hp(2),
   },
 
   // ── Bottom Actions ──
   bottomActionsRow: {
-    flexDirection: 'row',
+    flexDirection: "row",
     gap: wp(3),
     paddingHorizontal: wp(5),
     marginTop: hp(2.5),
@@ -2712,31 +2772,31 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: COLORS.white,
     borderWidth: 1.5,
-    borderColor: '#093A24',
+    borderColor: "#093A24",
     borderRadius: moderateScale(28),
     height: hp(6),
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
   },
   backStepBtnText: {
     fontFamily: FONTS.bold,
     fontSize: fontSize(13),
-    color: '#093A24',
+    color: "#093A24",
     letterSpacing: 0.5,
   },
   leaveBtn: {
     flex: 1,
-    backgroundColor: '#BCFF00',
+    backgroundColor: "#BCFF00",
     borderRadius: moderateScale(28),
     height: hp(6),
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
     elevation: 3,
   },
   leaveBtnText: {
     fontFamily: FONTS.bold,
     fontSize: fontSize(13),
-    color: '#093A24',
+    color: "#093A24",
     letterSpacing: 0.5,
   },
 
@@ -2747,57 +2807,57 @@ const styles = StyleSheet.create({
   yesOnlyQuestionText: {
     fontFamily: FONTS.bold,
     fontSize: fontSize(15.5),
-    color: '#093A24',
+    color: "#093A24",
     marginBottom: hp(1),
     lineHeight: fontSize(21),
   },
   yesOnlyFullBtn: {
-    backgroundColor: '#BCFF00',
+    backgroundColor: "#BCFF00",
     borderRadius: moderateScale(22),
     height: hp(5.5),
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
     elevation: 2,
   },
   yesOnlyFullBtnText: {
     fontFamily: FONTS.bold,
     fontSize: fontSize(14.5),
-    color: '#093A24',
+    color: "#093A24",
     letterSpacing: 0.5,
   },
   noneOfTheseBtn: {
-    backgroundColor: 'transparent',
+    backgroundColor: "transparent",
     borderWidth: 1.5,
-    borderColor: '#4A5568',
+    borderColor: "#4A5568",
     borderRadius: moderateScale(22),
     height: hp(5.5),
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
     marginTop: hp(1),
   },
   noneOfTheseBtnText: {
     fontFamily: FONTS.bold,
     fontSize: fontSize(13.5),
-    color: '#093A24',
+    color: "#093A24",
   },
 
   // ── Modal ──
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    justifyContent: "center",
+    alignItems: "center",
     paddingHorizontal: wp(6),
   },
   modalContent: {
-    width: '100%',
+    width: "100%",
     backgroundColor: COLORS.white,
     borderRadius: moderateScale(24),
     padding: wp(6),
-    position: 'relative',
+    position: "relative",
   },
   modalCloseCross: {
-    position: 'absolute',
+    position: "absolute",
     top: moderateScale(16),
     right: moderateScale(16),
     zIndex: 10,
@@ -2805,56 +2865,56 @@ const styles = StyleSheet.create({
   modalTitle: {
     fontFamily: FONTS.bold,
     fontSize: fontSize(18),
-    color: '#093A24',
+    color: "#093A24",
     marginTop: hp(1),
     marginBottom: hp(0.5),
   },
   modalScoreText: {
     fontFamily: FONTS.bold,
     fontSize: fontSize(14.5),
-    color: '#2EA200',
+    color: "#2EA200",
     marginBottom: hp(2.5),
   },
   modalStartNextBtn: {
-    width: '100%',
-    backgroundColor: '#BCFF00',
+    width: "100%",
+    backgroundColor: "#BCFF00",
     borderRadius: moderateScale(24),
     height: hp(5.5),
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
     marginBottom: hp(1.2),
   },
   modalBtnRow: {
-    flexDirection: 'row',
+    flexDirection: "row",
     gap: wp(3),
   },
   modalOutlineBtn: {
     flex: 1,
     backgroundColor: COLORS.white,
     borderWidth: 1.5,
-    borderColor: '#093A24',
+    borderColor: "#093A24",
     borderRadius: moderateScale(24),
     height: hp(5.5),
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
   },
   modalOutlineBtnText: {
     fontFamily: FONTS.bold,
     fontSize: fontSize(12),
-    color: '#093A24',
+    color: "#093A24",
   },
   modalSolidBtn: {
     flex: 1,
-    backgroundColor: '#BCFF00',
+    backgroundColor: "#BCFF00",
     borderRadius: moderateScale(24),
     height: hp(5.5),
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
   },
   modalSolidBtnText: {
     fontFamily: FONTS.bold,
     fontSize: fontSize(12),
-    color: '#093A24',
+    color: "#093A24",
   },
 });
 
