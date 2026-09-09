@@ -1570,6 +1570,11 @@ import {
   confirmInstructionSessionApi,
   backSessionStepApi,
 } from '../../services/playService';
+import { formatPlayLocationLabel } from '../../utils/playLocationLabel';
+import {
+  isNoneOfTheAboveOption,
+  NONE_OF_THESE_PLAY_ANOTHER_SHOT_LABEL,
+} from '../../utils/shotFlowOptionLabel';
 
 const trophyImg = require('../../assets/Images/ trophy.png');
 
@@ -1606,6 +1611,7 @@ const ActiveGameScreen = ({ navigation, route }) => {
   const [shotNumber, setShotNumber] = useState(1);
   const [score, setScore] = useState(0);
   const [originLocation, setOriginLocation] = useState('TEE');
+  const [locationLabel, setLocationLabel] = useState('Tee');
   const [promptText, setPromptText] = useState('After playing your shot…');
   const [questionText, setQuestionText] = useState('');
   const [activeQuestionId, setActiveQuestionId] = useState('');
@@ -1614,6 +1620,9 @@ const ActiveGameScreen = ({ navigation, route }) => {
   const [hiddenQuestionCount, setHiddenQuestionCount] = useState(0);
   const [allowNo, setAllowNo] = useState(true);
   const [instructionText, setInstructionText] = useState('');
+  const [noneOfTheseLabel, setNoneOfTheseLabel] = useState(
+    'None of these — play another shot',
+  );
   const [mapData, setMapData] = useState(emptyMap);
   const [playMeta, setPlayMeta] = useState({
     tournamentName: tournament?.title || tournament?.name || 'Tournament',
@@ -1690,8 +1699,23 @@ const ActiveGameScreen = ({ navigation, route }) => {
       if (sc != null) setScore(sc);
 
       if (playData.currentOrigin) setOriginLocation(playData.currentOrigin);
+      if (playData.locationLabel != null) {
+        setLocationLabel(playData.locationLabel);
+      } else if (playData.currentOrigin || par != null) {
+        setLocationLabel(
+          formatPlayLocationLabel({
+            currentOrigin: playData.currentOrigin || 'TEE',
+            currentPar: par ?? parValue,
+          }),
+        );
+      }
       if (playData.prompt) setPromptText(playData.prompt);
-      if (playData.instructionText != null) setInstructionText(playData.instructionText);
+      setInstructionText(playData.instructionText ?? '');
+      if (playData.noneOfTheseLabel) {
+        setNoneOfTheseLabel(playData.noneOfTheseLabel);
+      } else if (playData.answerMode === 'YES_ONLY') {
+        setNoneOfTheseLabel('None of these — play another shot');
+      }
 
       setPlayMeta((prev) => ({
         tournamentName:
@@ -1741,34 +1765,36 @@ const ActiveGameScreen = ({ navigation, route }) => {
         playData.can_go_back ??
         playData.canStepBack;
 
-      const isSubQuestionScreen = resolvedMode === 'YES_ONLY' || qList.length > 1;
-
-      const startHole = playData.holeStart ?? tournament?.holeStart ?? 1;
-      const currentHoleVal = playData.currentHole ?? playData.holeNumber ?? holeNumber ?? 1;
-      const currentShotVal = playData.currentShot ?? playData.shotNumber ?? shotNumber ?? 1;
-      const currentOriginVal = playData.currentOrigin || originLocation || 'TEE';
-
-      const isAbsoluteFirstStep =
-        !isSubQuestionScreen &&
-        currentHoleVal <= startHole &&
-        currentShotVal <= 1 &&
-        (currentOriginVal === 'TEE' || currentOriginVal === 'TEE_SHOT');
-
-      if (backendCanGoBack === false) {
-        setCanGoBack(false);
-      } else if (isAbsoluteFirstStep) {
-        setCanGoBack(false);
-      } else if (backendCanGoBack === true) {
-        setCanGoBack(true);
+      if (typeof backendCanGoBack === 'boolean') {
+        setCanGoBack(backendCanGoBack);
       } else {
-        setCanGoBack(true);
+        const startHole = playData.holeStart ?? tournament?.holeStart ?? 1;
+        const currentHoleVal = playData.currentHole ?? playData.holeNumber ?? holeNumber ?? 1;
+        const currentShotVal = playData.currentShot ?? playData.shotNumber ?? shotNumber ?? 1;
+        const currentOriginVal = playData.currentOrigin || originLocation || 'TEE';
+        const qList = Array.isArray(playData.questions) ? playData.questions : [];
+        const modeVal = String(playData.answerMode || '').toUpperCase();
+        const resolvedMode =
+          modeVal === 'YES_ONLY' || modeVal === 'YES_NO'
+            ? modeVal
+            : qList.length > 1
+              ? 'YES_ONLY'
+              : 'YES_NO';
+        const isSubQuestionScreen = resolvedMode === 'YES_ONLY' || qList.length > 1;
+        const isAbsoluteFirstStep =
+          screen === 'QUESTIONS' &&
+          !isSubQuestionScreen &&
+          currentHoleVal <= startHole &&
+          currentShotVal <= 1 &&
+          (currentOriginVal === 'TEE' || currentOriginVal === 'TEE_SHOT');
+        setCanGoBack(!isAbsoluteFirstStep);
       }
 
       if (screen === 'FINISHED' || playData.finished || playData.isFinished || playData.status === 'FINISHED') {
         setShowGameEndModal(true);
       }
     },
-    [activeSessionId, tournament, holeNumber, shotNumber, originLocation],
+    [activeSessionId, tournament, holeNumber, shotNumber, originLocation, parValue],
   );
 
   const runPlayAction = async (fn) => {
@@ -1854,8 +1880,51 @@ const ActiveGameScreen = ({ navigation, route }) => {
     );
   };
 
-  const handleAnswerNo = () => {
-    runPlayAction(() => answerNoSessionApi(tournamentId, activeSessionId, {}));
+  const handleAnswerNo = async () => {
+    if (!canCallSessionApi) {
+      Toast.show({
+        type: 'error',
+        text1: 'Session unavailable',
+        text2: 'Start the game again from Game Rules.',
+      });
+      return;
+    }
+    const prevShot = shotNumber;
+    try {
+      setActionLoading(true);
+      const res = await answerNoSessionApi(tournamentId, activeSessionId, {});
+      parseSessionState(res);
+      const playData = res?.play || res?.session || res?.gameSession || res;
+      const newShot = playData?.currentShot ?? playData?.shotNumber;
+      if (
+        playData?.screen === 'QUESTIONS' &&
+        newShot != null &&
+        Number(newShot) > Number(prevShot)
+      ) {
+        const loc = formatPlayLocationLabel({
+          locationLabel: playData.locationLabel,
+          currentOrigin: playData.currentOrigin || originLocation,
+          currentPar: playData.currentPar ?? parValue,
+        });
+        Toast.show({
+          type: 'info',
+          text1: `Shot ${newShot}`,
+          text2:
+            loc === 'Tee'
+              ? 'Play again from the tee.'
+              : `Play again from ${loc}.`,
+        });
+      }
+    } catch (err) {
+      if (err?.response?.status === 401) return;
+      const backendMsg =
+        err?.response?.data?.error ||
+        err?.response?.data?.message ||
+        'Could not update play state.';
+      Toast.show({ type: 'error', text1: 'Action Failed', text2: backendMsg });
+    } finally {
+      setActionLoading(false);
+    }
   };
 
   const handleConfirmInstruction = () => {
@@ -1917,18 +1986,22 @@ const ActiveGameScreen = ({ navigation, route }) => {
     .filter(Boolean)
     .join(' · ');
 
-  const formatLocation = (loc) => {
-    if (!loc) return 'TEE';
-    const clean = String(loc).replace('_', ' ');
-    if (clean.length > 11) return clean.slice(0, 10) + '…';
-    return clean;
-  };
+  const displayLocation = formatPlayLocationLabel({
+    locationLabel,
+    currentOrigin: originLocation,
+    currentPar: parValue,
+  });
+
+  const questionSectionLabel =
+    playScreen === 'INSTRUCTION'
+      ? 'Instruction'
+      : promptText || displayLocation;
 
   const statPills = [
     { icon: 'award', label: 'HOLE', value: holeNumber },
     { icon: 'book', label: 'PAR', value: parValue },
     { icon: 'trending-up', label: 'SHOT', value: shotNumber },
-    { icon: 'shield', label: 'LOCATION', value: formatLocation(originLocation) },
+    { icon: 'shield', label: 'LOCATION', value: displayLocation },
   ];
 
   return (
@@ -2005,26 +2078,44 @@ const ActiveGameScreen = ({ navigation, route }) => {
         {playScreen === 'QUESTIONS' && questionList.length > 0 ? (
           <>
             <Text style={styles.questionSectionHeader}>
-              {promptText || 'After playing your shot…'}
+              {questionSectionLabel}
             </Text>
 
             {answerMode === 'YES_ONLY' ? (
               <View style={styles.questionCard}>
-                {questionList.map((qItem, idx) => (
-                  <View key={qItem.id || `q-${idx}`} style={styles.yesOnlyGroupWrap}>
-                    <Text style={styles.yesOnlyQuestionText}>
-                      {qItem.text || qItem.question}
-                    </Text>
-                    <TouchableOpacity
-                      style={styles.yesOnlyFullBtn}
-                      onPress={() => handleAnswerYes(qItem.id || qItem._id || qItem.questionId)}
-                      disabled={actionLoading}
-                      activeOpacity={0.85}
-                    >
-                      <Text style={styles.yesOnlyFullBtnText}>YES</Text>
-                    </TouchableOpacity>
-                  </View>
-                ))}
+                {questionList.map((qItem, idx) => {
+                  const qId = qItem.id || qItem._id || qItem.questionId;
+                  if (isNoneOfTheAboveOption(qItem)) {
+                    return (
+                      <TouchableOpacity
+                        key={qId || `q-none-${idx}`}
+                        style={styles.noneOfTheseBtn}
+                        onPress={() => handleAnswerYes(qId)}
+                        disabled={actionLoading}
+                        activeOpacity={0.88}
+                      >
+                        <Text style={styles.noneOfTheseBtnText}>
+                          {NONE_OF_THESE_PLAY_ANOTHER_SHOT_LABEL}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  }
+                  return (
+                    <View key={qId || `q-${idx}`} style={styles.yesOnlyGroupWrap}>
+                      <Text style={styles.yesOnlyQuestionText}>
+                        {qItem.text || qItem.question}
+                      </Text>
+                      <TouchableOpacity
+                        style={styles.yesOnlyFullBtn}
+                        onPress={() => handleAnswerYes(qId)}
+                        disabled={actionLoading}
+                        activeOpacity={0.85}
+                      >
+                        <Text style={styles.yesOnlyFullBtnText}>YES</Text>
+                      </TouchableOpacity>
+                    </View>
+                  );
+                })}
 
                 {allowNo ? (
                   <TouchableOpacity
@@ -2034,7 +2125,7 @@ const ActiveGameScreen = ({ navigation, route }) => {
                     activeOpacity={0.88}
                   >
                     <Text style={styles.noneOfTheseBtnText}>
-                      None of these — play another shot
+                      {noneOfTheseLabel}
                     </Text>
                   </TouchableOpacity>
                 ) : null}
@@ -2074,7 +2165,9 @@ const ActiveGameScreen = ({ navigation, route }) => {
 
         {playScreen === 'QUESTIONS' && questionList.length === 0 ? (
           <>
-            <Text style={styles.questionSectionHeader}>{promptText || 'Question'}</Text>
+            <Text style={styles.questionSectionHeader}>
+              {promptText || displayLocation}
+            </Text>
             <View style={styles.questionCard}>
               <Text style={styles.questionText}>No question here</Text>
               <Text style={styles.noQuestionDescription}>
@@ -2425,6 +2518,21 @@ const styles = StyleSheet.create({
     color: '#718096',
     lineHeight: fontSize(17),
     marginBottom: hp(1.2),
+  },
+  stageInstructionBanner: {
+    marginBottom: hp(1.2),
+    paddingHorizontal: wp(3.5),
+    paddingVertical: hp(1.2),
+    borderRadius: moderateScale(10),
+    backgroundColor: 'rgba(188, 255, 0, 0.12)',
+    borderWidth: 1,
+    borderColor: 'rgba(188, 255, 0, 0.35)',
+  },
+  stageInstructionText: {
+    fontFamily: FONTS.medium,
+    fontSize: fontSize(13),
+    color: '#2EA200',
+    lineHeight: fontSize(19),
   },
   questionHeaderWrap: {
     marginBottom: hp(1.2),
