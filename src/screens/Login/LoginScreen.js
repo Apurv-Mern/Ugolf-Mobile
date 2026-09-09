@@ -762,7 +762,7 @@ const LoginScreen = ({ navigation }) => {
 
             {/* Bottom Register Link */}
             <View style={styles.registerRow}>
-              <Text style={styles.newText}>New to UGolf?</Text>
+              <Text style={styles.newText}>New to Universal Golf?</Text>
               <TouchableOpacity
                 onPress={() => navigation.navigate('SignUp')}
                 activeOpacity={0.7}
@@ -833,7 +833,7 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.white,
     paddingHorizontal: wp(7),
     paddingTop: hp(1),
-    paddingBottom: hp(4),
+    paddingBottom: hp(8),
     position: 'relative',
   },
   dotPatternContainer: {
@@ -895,6 +895,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     marginTop: hp(3.5),
+    marginBottom: hp(4),
   },
   newText: {
     fontFamily: FONTS.medium,

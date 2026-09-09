@@ -752,7 +752,7 @@ const ChoosePlanScreen = ({ navigation }) => {
           </Text>
 
           <Text style={styles.subtitle}>
-            Unlock the full UGolf experience
+            Unlock the full Universal Golf experience
           </Text>
         </View>
 
