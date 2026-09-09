@@ -16,8 +16,6 @@ export function formatPlayLocationLabel(input) {
   }
 
   if (par === 4 && stage === "FAIRWAY_SECOND_SHOT") {
-    if (input?.pendingDestination === "Tee") return "Tee";
-    if (input?.pendingDestination === "None of the above") return "Tee";
     return "Fairway";
   }
 
