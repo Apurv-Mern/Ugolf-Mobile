@@ -2186,9 +2186,11 @@ const ActiveGameScreen = ({ navigation, route }) => {
               </View>
             ) : (
               <View style={styles.questionCard}>
-                {hiddenQuestionCount > 0 ? (
-                  <Text style={styles.hiddenQuestionHint}></Text>
-                ) : null}
+                {/* {hiddenQuestionCount > 0 ? (
+                  <Text style={styles.hiddenQuestionHint}>
+                    On the green or holed out? Tap No to see those options.
+                  </Text>
+                ) : null} */}
                 <Text style={styles.questionText}>{questionText}</Text>
                 <View style={styles.yesNoRow}>
                   <TouchableOpacity
