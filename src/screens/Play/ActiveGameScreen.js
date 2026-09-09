@@ -1541,7 +1541,9 @@ import {
   ActivityIndicator,
   Alert,
   Modal,
+  AppState,
 } from "react-native";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useFocusEffect } from "@react-navigation/native";
 import Toast from "react-native-toast-message";
 
@@ -1579,12 +1581,15 @@ const emptyMap = {
 };
 
 const ActiveGameScreen = ({ navigation, route }) => {
-  const tournament = route?.params?.tournament;
+  const [restoredTournament, setRestoredTournament] = useState(null);
+  const [restoredTournamentId, setRestoredTournamentId] = useState('');
+
+  const tournament = route?.params?.tournament || restoredTournament;
   const selectedTeam = route?.params?.selectedTeam;
   const players = route?.params?.players;
   const playModeParam = route?.params?.playMode || "practice";
   const initialSessionData = route?.params?.initialSessionData;
-  const tournamentId = tournament?.id || tournament?._id;
+  const tournamentId = tournament?.id || tournament?._id || route?.params?.tournamentId || restoredTournamentId;
 
   const [activeSessionId, setActiveSessionId] = useState(
     route?.params?.sessionId ||
@@ -1670,135 +1675,162 @@ const ActiveGameScreen = ({ navigation, route }) => {
   const parseSessionState = useCallback(
     (data) => {
       if (!data) return;
-      const playData = data.play || data.session || data.gameSession || data;
+      try {
+        const playData = data.play || data.session || data.gameSession || data;
 
-      const sId = playData.sessionId || data.sessionId || activeSessionId;
-      if (sId) setActiveSessionId(String(sId));
+        const sId = playData.sessionId || data.sessionId || activeSessionId;
+        if (sId) setActiveSessionId(String(sId));
 
-      const screen =
-        playData.screen || (playData.finished ? "FINISHED" : "QUESTIONS");
-      setPlayScreen(screen);
+        const screen =
+          playData.screen || (playData.finished ? "FINISHED" : "QUESTIONS");
+        setPlayScreen(screen);
 
-      const hole = playData.currentHole ?? playData.holeNumber ?? playData.hole;
-      if (hole != null) setHoleNumber(hole);
+        const hole = playData.currentHole ?? playData.holeNumber ?? playData.hole;
+        if (hole != null) setHoleNumber(hole);
 
-      const par = playData.currentPar ?? playData.parValue ?? playData.par;
-      if (par != null) setParValue(par);
+        const par = playData.currentPar ?? playData.parValue ?? playData.par;
+        if (par != null) setParValue(par);
 
-      const shot = playData.currentShot ?? playData.shotNumber ?? playData.shot;
-      if (shot != null) setShotNumber(shot);
+        const shot = playData.currentShot ?? playData.shotNumber ?? playData.shot;
+        if (shot != null) setShotNumber(shot);
 
-      const sc = playData.score ?? playData.totalScore;
-      if (sc != null) setScore(sc);
+        const sc = playData.score ?? playData.totalScore;
+        if (sc != null) setScore(sc);
 
-      if (playData.currentOrigin) setOriginLocation(playData.currentOrigin);
-      if (playData.locationLabel != null) {
-        setLocationLabel(playData.locationLabel);
-      } else if (playData.currentOrigin || par != null) {
-        setLocationLabel(
-          formatPlayLocationLabel({
-            currentOrigin: playData.currentOrigin || "TEE",
-            currentPar: par ?? parValue,
-          }),
-        );
-      }
-      if (playData.prompt) setPromptText(playData.prompt);
-      setInstructionText(playData.instructionText ?? "");
-      if (playData.noneOfTheseLabel) {
-        setNoneOfTheseLabel(playData.noneOfTheseLabel);
-      } else if (playData.answerMode === "YES_ONLY") {
-        setNoneOfTheseLabel("None of these — play another shot");
-      }
+        if (playData.currentOrigin) setOriginLocation(playData.currentOrigin);
+        if (playData.locationLabel != null) {
+          setLocationLabel(playData.locationLabel);
+        } else if (playData.currentOrigin || par != null) {
+          setLocationLabel(
+            formatPlayLocationLabel({
+              currentOrigin: playData.currentOrigin || "TEE",
+              currentPar: par ?? parValue,
+            }),
+          );
+        }
+        if (playData.prompt) setPromptText(playData.prompt);
+        if (playData.instructionText != null) {
+          setInstructionText(playData.instructionText);
+        }
+        if (playData.noneOfTheseLabel) {
+          setNoneOfTheseLabel(playData.noneOfTheseLabel);
+        } else if (playData.answerMode === "YES_ONLY") {
+          setNoneOfTheseLabel("None of these — play another shot");
+        }
 
-      setPlayMeta((prev) => ({
-        tournamentName:
-          playData.tournamentName ||
-          tournament?.title ||
-          tournament?.name ||
-          prev.tournamentName,
-        golfCourseName: playData.golfCourseName || prev.golfCourseName,
-        playMode: playData.playMode || prev.playMode,
-        gameNumber: playData.gameNumber ?? prev.gameNumber,
-        holeStart: playData.holeStart ?? prev.holeStart,
-        holeEnd: playData.holeEnd ?? prev.holeEnd,
-      }));
+        setPlayMeta((prev) => ({
+          tournamentName:
+            playData.tournamentName ||
+            tournament?.title ||
+            tournament?.name ||
+            prev.tournamentName,
+          golfCourseName: playData.golfCourseName || prev.golfCourseName,
+          playMode: playData.playMode || prev.playMode,
+          gameNumber: playData.gameNumber ?? prev.gameNumber,
+          holeStart: playData.holeStart ?? prev.holeStart,
+          holeEnd: playData.holeEnd ?? prev.holeEnd,
+        }));
 
-      if (playData.map && typeof playData.map === "object") {
-        setMapData({
-          hasGps: !!playData.map.hasGps,
-          green: playData.map.green ?? null,
-          tee: playData.map.tee ?? null,
-          currentHolePois: Array.isArray(playData.map.currentHolePois)
-            ? playData.map.currentHolePois
-            : [],
-        });
-      }
+        if (playData.map && typeof playData.map === "object") {
+          setMapData({
+            hasGps: !!playData.map.hasGps,
+            green: playData.map.green ?? null,
+            tee: playData.map.tee ?? null,
+            currentHolePois: Array.isArray(playData.map.currentHolePois)
+              ? playData.map.currentHolePois
+              : [],
+          });
+        }
 
-      const qList = Array.isArray(playData.questions) ? playData.questions : [];
-      const modeVal = String(playData.answerMode || "").toUpperCase();
-      const resolvedMode =
-        modeVal === "YES_ONLY" || modeVal === "YES_NO"
-          ? modeVal
-          : qList.length > 1
-          ? "YES_ONLY"
-          : "YES_NO";
-      setAnswerMode(resolvedMode);
-      setQuestionList(qList);
-      setHiddenQuestionCount(Number(playData.hiddenQuestionCount) || 0);
-      setAllowNo(playData.allowNo !== false && screen === "QUESTIONS");
-
-      if (qList.length > 0) {
-        const first = qList[0];
-        setQuestionText(first.text || first.question || "");
-        setActiveQuestionId(
-          String(first.id || first._id || first.questionId || ""),
-        );
-      } else {
-        setQuestionText("");
-        setActiveQuestionId("");
-      }
-
-      const backendCanGoBack =
-        playData.canGoBack ?? playData.can_go_back ?? playData.canStepBack;
-
-      if (typeof backendCanGoBack === "boolean") {
-        setCanGoBack(backendCanGoBack);
-      } else {
-        const startHole = playData.holeStart ?? tournament?.holeStart ?? 1;
-        const currentHoleVal =
-          playData.currentHole ?? playData.holeNumber ?? holeNumber ?? 1;
-        const currentShotVal =
-          playData.currentShot ?? playData.shotNumber ?? shotNumber ?? 1;
-        const currentOriginVal =
-          playData.currentOrigin || originLocation || "TEE";
-        const qList = Array.isArray(playData.questions)
-          ? playData.questions
-          : [];
+        const qList = Array.isArray(playData.questions) ? playData.questions : [];
         const modeVal = String(playData.answerMode || "").toUpperCase();
         const resolvedMode =
           modeVal === "YES_ONLY" || modeVal === "YES_NO"
             ? modeVal
             : qList.length > 1
-            ? "YES_ONLY"
-            : "YES_NO";
-        const isSubQuestionScreen =
-          resolvedMode === "YES_ONLY" || qList.length > 1;
-        const isAbsoluteFirstStep =
-          screen === "QUESTIONS" &&
-          !isSubQuestionScreen &&
-          currentHoleVal <= startHole &&
-          currentShotVal <= 1 &&
-          (currentOriginVal === "TEE" || currentOriginVal === "TEE_SHOT");
-        setCanGoBack(!isAbsoluteFirstStep);
-      }
+              ? "YES_ONLY"
+              : "YES_NO";
+        setAnswerMode(resolvedMode);
+        setQuestionList(qList);
+        setHiddenQuestionCount(Number(playData.hiddenQuestionCount) || 0);
+        setAllowNo(playData.allowNo !== false && screen === "QUESTIONS");
 
-      if (
-        screen === "FINISHED" ||
-        playData.finished ||
-        playData.isFinished ||
-        playData.status === "FINISHED"
-      ) {
-        setShowGameEndModal(true);
+        if (qList.length > 0) {
+          const first = qList[0];
+          setQuestionText(first.text || first.question || "");
+          setActiveQuestionId(
+            String(first.id || first._id || first.questionId || ""),
+          );
+        } else {
+          setQuestionText("");
+          setActiveQuestionId("");
+        }
+
+        const backendCanGoBack =
+          playData.canGoBack ?? playData.can_go_back ?? playData.canStepBack;
+
+        if (typeof backendCanGoBack === "boolean") {
+          setCanGoBack(backendCanGoBack);
+        } else {
+          const startHole = playData.holeStart ?? tournament?.holeStart ?? 1;
+          const currentHoleVal =
+            playData.currentHole ?? playData.holeNumber ?? holeNumber ?? 1;
+          const currentShotVal =
+            playData.currentShot ?? playData.shotNumber ?? shotNumber ?? 1;
+          const currentOriginVal =
+            playData.currentOrigin || originLocation || "TEE";
+          const isSubQuestionScreen =
+            resolvedMode === "YES_ONLY" || qList.length > 1;
+          const isAbsoluteFirstStep =
+            screen === "QUESTIONS" &&
+            !isSubQuestionScreen &&
+            currentHoleVal <= startHole &&
+            currentShotVal <= 1 &&
+            (currentOriginVal === "TEE" || currentOriginVal === "TEE_SHOT");
+          setCanGoBack(!isAbsoluteFirstStep);
+        }
+
+        if (
+          screen === "FINISHED" ||
+          playData.finished ||
+          playData.isFinished ||
+          playData.status === "FINISHED"
+        ) {
+          setShowGameEndModal(true);
+          AsyncStorage.removeItem("@ugolf_active_game_session").catch(() => {});
+        } else if (sId && (tournamentId || playData.tournamentId)) {
+          try {
+            const safeTournament = tournament
+              ? {
+                  id: tournament.id || tournament._id,
+                  _id: tournament._id || tournament.id,
+                  title: tournament.title || tournament.name || "Tournament",
+                  name: tournament.name || tournament.title || "Tournament",
+                  golfCourseName:
+                    tournament.golfCourseName || tournament.location || "",
+                  playMode: tournament.playMode || playModeParam,
+                  numberOfGames: tournament.numberOfGames || 1,
+                  holeStart: tournament.holeStart || 1,
+                  holeEnd: tournament.holeEnd || 18,
+                }
+              : null;
+
+            AsyncStorage.setItem(
+              "@ugolf_active_game_session",
+              JSON.stringify({
+                activeSessionId: String(sId),
+                tournamentId: String(tournamentId || playData.tournamentId),
+                tournament: safeTournament,
+                playModeParam,
+                timestamp: Date.now(),
+              }),
+            ).catch(() => {});
+          } catch (e) {
+            console.log("AsyncStorage save active session error:", e);
+          }
+        }
+      } catch (err) {
+        console.log("parseSessionState error:", err);
       }
     },
     [
@@ -1808,6 +1840,8 @@ const ActiveGameScreen = ({ navigation, route }) => {
       shotNumber,
       originLocation,
       parValue,
+      tournamentId,
+      playModeParam,
     ],
   );
 
@@ -1836,7 +1870,8 @@ const ActiveGameScreen = ({ navigation, route }) => {
     }
   };
 
-  const loadSessionState = async () => {
+  const loadSessionState = useCallback(async () => {
+    if (!canCallSessionApi) return;
     try {
       setActionLoading(true);
       const res = await getGameSessionApi(tournamentId, activeSessionId);
@@ -1846,7 +1881,7 @@ const ActiveGameScreen = ({ navigation, route }) => {
     } finally {
       setActionLoading(false);
     }
-  };
+  }, [canCallSessionApi, tournamentId, activeSessionId, parseSessionState]);
 
   useEffect(() => {
     if (initialSessionData) {
@@ -1856,6 +1891,50 @@ const ActiveGameScreen = ({ navigation, route }) => {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tournamentId, activeSessionId]);
+
+  // Handle app resuming from background (2-3 min delay / RAM reclamation)
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', (nextAppState) => {
+      if (nextAppState === 'active' && canCallSessionApi) {
+        console.log('App resumed from background -> refreshing active game session...');
+        loadSessionState();
+      }
+    });
+
+    return () => {
+      subscription.remove();
+    };
+  }, [canCallSessionApi, loadSessionState]);
+
+  // Restore session from AsyncStorage if OS process death destroyed route.params
+  useEffect(() => {
+    let cancelled = false;
+    const restoreSession = async () => {
+      if (!canCallSessionApi) {
+        try {
+          const raw = await AsyncStorage.getItem('@ugolf_active_game_session');
+          if (raw && !cancelled) {
+            const parsed = JSON.parse(raw);
+            if (parsed?.activeSessionId && !activeSessionId) {
+              setActiveSessionId(parsed.activeSessionId);
+            }
+            if (parsed?.tournamentId && !restoredTournamentId) {
+              setRestoredTournamentId(parsed.tournamentId);
+            }
+            if (parsed?.tournament && !restoredTournament) {
+              setRestoredTournament(parsed.tournament);
+            }
+          }
+        } catch (e) {
+          console.log('Session restore error:', e);
+        }
+      }
+    };
+    restoreSession();
+    return () => {
+      cancelled = true;
+    };
+  }, [canCallSessionApi, activeSessionId, restoredTournamentId, restoredTournament]);
 
   useEffect(() => {
     if (playScreen !== "FINISHED" && !showGameEndModal) return;

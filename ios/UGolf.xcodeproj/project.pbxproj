@@ -306,7 +306,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CLANG_ENABLE_MODULES = YES;
 				CODE_SIGN_ENTITLEMENTS = UGolf/UGolf.entitlements;
-				CURRENT_PROJECT_VERSION = 2;
+				CURRENT_PROJECT_VERSION = 3;
 				DEVELOPMENT_TEAM = 5NBYKWJL2V;
 				ENABLE_BITCODE = NO;
 				INFOPLIST_FILE = UGolf/Info.plist;
@@ -322,7 +322,7 @@
 					"-ObjC",
 					"-lc++",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = "UGolf---com.dotsquares.ugolf";
+				PRODUCT_BUNDLE_IDENTIFIER = "UGolf-com.dotsquares.ugolf";
 				PRODUCT_NAME = UGolf;
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
@@ -339,7 +339,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CLANG_ENABLE_MODULES = YES;
 				CODE_SIGN_ENTITLEMENTS = UGolf/UGolf.entitlements;
-				CURRENT_PROJECT_VERSION = 2;
+				CURRENT_PROJECT_VERSION = 3;
 				DEVELOPMENT_TEAM = 5NBYKWJL2V;
 				INFOPLIST_FILE = UGolf/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = UGolf;
@@ -354,7 +354,7 @@
 					"-ObjC",
 					"-lc++",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = "UGolf---com.dotsquares.ugolf";
+				PRODUCT_BUNDLE_IDENTIFIER = "UGolf-com.dotsquares.ugolf";
 				PRODUCT_NAME = UGolf;
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
 				SWIFT_VERSION = 5.0;

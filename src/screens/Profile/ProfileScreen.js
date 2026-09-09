@@ -463,6 +463,7 @@ import {
   Switch,
   StatusBar,
   Alert,
+  Linking,
 } from 'react-native';
 
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -906,10 +907,10 @@ const ProfileScreen = ({ navigation }) => {
         <View style={styles.menuSection}>
 
           {/* ===================================================
-              NOTIFICATIONS
+              NOTIFICATIONS (Hidden for now)
           ==================================================== */}
 
-          <View style={styles.menuCard}>
+          {/* <View style={styles.menuCard}>
 
             <View style={styles.iconCircle}>
 
@@ -942,7 +943,7 @@ const ProfileScreen = ({ navigation }) => {
               ios_backgroundColor="#E2E8F0"
             />
 
-          </View>
+          </View> */}
 
 
           {/* ===================================================
@@ -1192,8 +1193,7 @@ const ProfileScreen = ({ navigation }) => {
           <TouchableOpacity
             style={styles.accountRow}
             onPress={() =>
-              navigation?.navigate &&
-              navigation.navigate('PrivacyPolicy')
+              Linking.openURL('https://universalgolf-owner.com/privacy-policy.html').catch(() => {})
             }
             activeOpacity={0.7}
           >

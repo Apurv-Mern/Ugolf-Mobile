@@ -601,6 +601,7 @@ const HoleMap = ({ mapData, holeNumber, compact = false }) => {
       .then((granted) => {
         setLocationGranted(granted);
         if (granted) {
+          setGeoError(null);
           try {
             Mapbox.locationManager.start();
           } catch (e) {
