@@ -322,6 +322,10 @@ const CreateTournamentScreen = ({ navigation, route }) => {
             : ['Australia', 'USA', 'UK', 'New Zealand'];
         setCountriesList(countryOptions);
 
+        if (isEditing || tournamentParam || editingTournamentId) {
+          return;
+        }
+
         const player =
           profileRes?.player ||
           profileRes?.data?.player ||
@@ -349,7 +353,7 @@ const CreateTournamentScreen = ({ navigation, route }) => {
     return () => {
       cancelled = true;
     };
-  }, [currentUser?.country]);
+  }, [currentUser?.country, isEditing, tournamentParam, editingTournamentId]);
 
   // Pre-fill fields if editing an existing tournament
   useEffect(() => {
@@ -395,8 +399,14 @@ const CreateTournamentScreen = ({ navigation, route }) => {
         }
       }
 
-      if (tournamentParam.country) setCountry(tournamentParam.country);
-      if (tournamentParam.state) setState(tournamentParam.state);
+      if (tournamentParam.country) {
+        setCountry(tournamentParam.country);
+        prevCountryRef.current = tournamentParam.country;
+      }
+      if (tournamentParam.state) {
+        setState(tournamentParam.state);
+        prevStateRef.current = tournamentParam.state;
+      }
       const loc = tournamentParam.suburb || tournamentParam.city || '';
       if (loc) {
         setSuburb(loc);
@@ -434,12 +444,19 @@ const CreateTournamentScreen = ({ navigation, route }) => {
             if (!active) return;
             const fullT = res?.tournament || res?.data?.tournament || res?.data || res;
             if (fullT) {
+              isEditingPrefilled.current = true;
               if (fullT.name || fullT.title) setTournamentName(fullT.name || fullT.title);
               if (fullT.description) setDescription(fullT.description);
               if (fullT.sponsor) setSponsorName(fullT.sponsor);
               if (fullT.prize) setTournamentPrize(fullT.prize);
-              if (fullT.country) setCountry(fullT.country);
-              if (fullT.state) setState(fullT.state);
+              if (fullT.country) {
+                setCountry(fullT.country);
+                prevCountryRef.current = fullT.country;
+              }
+              if (fullT.state) {
+                setState(fullT.state);
+                prevStateRef.current = fullT.state;
+              }
               const fullLoc = fullT.suburb || fullT.city || '';
               if (fullLoc) {
                 setSuburb(fullLoc);
@@ -536,7 +553,7 @@ const CreateTournamentScreen = ({ navigation, route }) => {
       if (isEditingPrefilled.current) {
         isEditingPrefilled.current = false;
         loadClubs(country, state !== 'Select State' ? state : undefined);
-      } else if (prevCountryRef.current && prevCountryRef.current !== country) {
+      } else if (!isEditing && prevCountryRef.current && prevCountryRef.current !== country) {
         setState('Select State');
         setGolfClub('Select Golf Club');
         setGolfClubId('');
@@ -554,13 +571,13 @@ const CreateTournamentScreen = ({ navigation, route }) => {
       countryInitialized.current = false;
       prevCountryRef.current = country;
     }
-  }, [country]);
+  }, [country, isEditing]);
 
   useEffect(() => {
     if (country && country !== 'Select Country' && state && state !== 'Select State') {
       if (isSelectingClubRef.current) {
         isSelectingClubRef.current = false;
-      } else if (prevStateRef.current && prevStateRef.current !== state) {
+      } else if (!isEditing && prevStateRef.current && prevStateRef.current !== state) {
         setGolfClub('Select Golf Club');
         setGolfClubId('');
         setClubHasMap(null);
@@ -572,7 +589,7 @@ const CreateTournamentScreen = ({ navigation, route }) => {
       loadClubs(country, state);
       prevStateRef.current = state;
     }
-  }, [state]);
+  }, [state, country, isEditing]);
 
   useFocusEffect(
     React.useCallback(() => {
@@ -597,6 +614,30 @@ const CreateTournamentScreen = ({ navigation, route }) => {
     setActiveDropdown(type);
   };
 
+  // Open dynamic Country dropdown
+  const handleOpenCountryDropdown = () => {
+    const options =
+      countriesList.length > 0
+        ? countriesList
+        : ['Australia', 'USA', 'UK', 'New Zealand', 'India'];
+    handleOpenDropdown('country', options, (selectedCountry) => {
+      setCountryError('');
+      if (selectedCountry !== country) {
+        setCountry(selectedCountry);
+        setState('Select State');
+        setGolfClub('Select Golf Club');
+        setGolfClubId('');
+        setClubHasMap(null);
+        setSuburb('');
+        setCity('');
+        setStateError('');
+        setGolfClubError('');
+        setSuburbError('');
+        setCityError('');
+      }
+    });
+  };
+
   // Open dynamic State dropdown based on selected Country
   const handleOpenStateDropdown = () => {
     if (!country || country === 'Select Country') {
@@ -609,17 +650,19 @@ const CreateTournamentScreen = ({ navigation, route }) => {
     }
 
     const options = statesList.length > 0 ? statesList : ['NSW', 'VIC', 'QLD', 'WA', 'SA', 'TAS'];
-    handleOpenDropdown('state', options, (val) => {
-      setState(val);
+    handleOpenDropdown('state', options, (selectedState) => {
       setStateError('');
-      // When user manually picks a new state from State dropdown, reset Golf Club & Suburb/City
-      setGolfClub('Select Golf Club');
-      setGolfClubId('');
-      setClubHasMap(null);
-      setSuburb('');
-      setCity('');
-      setGolfClubError('');
-      setSuburbError('');
+      if (selectedState !== state) {
+        setState(selectedState);
+        setGolfClub('Select Golf Club');
+        setGolfClubId('');
+        setClubHasMap(null);
+        setSuburb('');
+        setCity('');
+        setGolfClubError('');
+        setSuburbError('');
+        setCityError('');
+      }
     });
   };
 
@@ -1092,15 +1135,7 @@ const CreateTournamentScreen = ({ navigation, route }) => {
         <Text style={styles.formLabel}>Country</Text>
         <TouchableOpacity
           style={styles.formDropdownTrigger}
-          onPress={() =>
-            handleOpenDropdown(
-              'country',
-              countriesList.length > 0
-                ? countriesList
-                : ['Australia', 'USA', 'UK', 'New Zealand'],
-              setCountry,
-            )
-          }
+          onPress={handleOpenCountryDropdown}
           activeOpacity={0.8}
         >
           <Text style={styles.dropdownValueText}>{country}</Text>
