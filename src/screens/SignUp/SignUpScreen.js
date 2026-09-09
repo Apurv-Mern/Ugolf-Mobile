@@ -1200,14 +1200,14 @@ const SignUpScreen = ({ navigation }) => {
                 I agree to the{' '}
                 <Text
                   style={styles.termsHighlight}
-                  onPress={() => Linking.openURL('https://universalgolf-owner.com/terms-and-conditions.html').catch(() => {})}
+                  onPress={() => Linking.openURL('https://universalgolf-owner.com/terms-and-conditions.html').catch(() => { })}
                 >
                   Terms of Service
                 </Text>{' '}
                 and{' '}
                 <Text
                   style={styles.termsHighlight}
-                  onPress={() => Linking.openURL('https://universalgolf-owner.com/privacy-policy.html').catch(() => {})}
+                  onPress={() => Linking.openURL('https://universalgolf-owner.com/privacy-policy.html').catch(() => { })}
                 >
                   Privacy Policy
                 </Text>{' '}
@@ -1307,7 +1307,7 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.white,
     paddingHorizontal: wp(7),
     paddingTop: hp(1),
-    paddingBottom: hp(4),
+    paddingBottom: hp(8),
     position: 'relative',
   },
   termsRow: {
@@ -1355,6 +1355,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     marginTop: hp(3.5),
+    marginBottom: hp(4),
   },
   alreadyText: {
     fontFamily: FONTS.medium,
