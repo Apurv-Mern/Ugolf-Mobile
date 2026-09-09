@@ -745,42 +745,51 @@ const EmailVerificationScreen = ({ navigation, route }) => {
     };
     logToken();
 
-    // Auto-trigger OTP sending on screen mount
+    // Auto-trigger OTP sending on screen mount unless sendOTP is false (e.g. fresh Sign Up where registerApi already sent the OTP)
     if (email) {
-      const autoSendOtp = async () => {
-        try {
-          setInitialSendingOtp(true);
-          await sendVerificationOtpApi({ email });
+      if (route?.params?.sendOTP === false) {
+        // OTP was already sent by registration API
+        timerEndTimeRef.current = Date.now() + TIMER_DURATION * 1000;
+        setTimer(TIMER_DURATION);
+        setTimeout(() => {
+          inputRef.current?.focus();
+        }, 350);
+      } else {
+        const autoSendOtp = async () => {
+          try {
+            setInitialSendingOtp(true);
+            await sendVerificationOtpApi({ email });
 
-          // Start 10-minute countdown timer ONLY AFTER API succeeds!
-          timerEndTimeRef.current = Date.now() + TIMER_DURATION * 1000;
-          setTimer(TIMER_DURATION);
+            // Start 10-minute countdown timer ONLY AFTER API succeeds!
+            timerEndTimeRef.current = Date.now() + TIMER_DURATION * 1000;
+            setTimer(TIMER_DURATION);
 
-          Toast.show({
-            type: 'success',
-            text1: 'OTP Sent',
-            text2: 'A verification code has been sent to your email.',
-          });
+            Toast.show({
+              type: 'success',
+              text1: 'OTP Sent',
+              text2: 'A verification code has been sent to your email.',
+            });
 
-          // Focus the input to open the keyboard automatically
-          setTimeout(() => {
-            inputRef.current?.focus();
-          }, 350);
-        } catch (error) {
-          console.log('Auto-OTP Mount Error:', error);
-          const errorMsg = error?.response?.data?.error || error?.response?.data?.message || error?.message || 'Failed to send verification OTP.';
-          Toast.show({
-            type: 'error',
-            text1: 'Error',
-            text2: errorMsg,
-          });
-        } finally {
-          setInitialSendingOtp(false);
-        }
-      };
-      autoSendOtp();
+            // Focus the input to open the keyboard automatically
+            setTimeout(() => {
+              inputRef.current?.focus();
+            }, 350);
+          } catch (error) {
+            console.log('Auto-OTP Mount Error:', error);
+            const errorMsg = error?.response?.data?.error || error?.response?.data?.message || error?.message || 'Failed to send verification OTP.';
+            Toast.show({
+              type: 'error',
+              text1: 'Error',
+              text2: errorMsg,
+            });
+          } finally {
+            setInitialSendingOtp(false);
+          }
+        };
+        autoSendOtp();
+      }
     }
-  }, [email]);
+  }, [email, route?.params?.sendOTP]);
 
   const formatTimer = (time) => {
     if (time === null || time === undefined) return '--:--';

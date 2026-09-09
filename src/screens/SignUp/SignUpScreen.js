@@ -1006,7 +1006,7 @@ const SignUpScreen = ({ navigation }) => {
       } else {
         navigation.replace('EmailVerification', {
           email: email.trim(),
-          sendOTP: true,
+          sendOTP: false,
         });
       }
     } catch (error) {
