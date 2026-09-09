@@ -762,7 +762,7 @@ const LoginScreen = ({ navigation }) => {
 
             {/* Bottom Register Link */}
             <View style={styles.registerRow}>
-              <Text style={styles.newText}>New to UGolf?</Text>
+              <Text style={styles.newText}>New to Universal Golf?</Text>
               <TouchableOpacity
                 onPress={() => navigation.navigate('SignUp')}
                 activeOpacity={0.7}
