@@ -448,6 +448,8 @@ const LeaderboardScreen = ({ navigation, route }) => {
   const tournamentId = tournament?.id || tournament?._id;
   const playMode = route?.params?.playMode || tournament?.playMode || 'practice';
 
+  const fromActiveGame = route?.params?.fromActiveGame === true;
+
   const [selectedGame, setSelectedGame] = useState(Number(route?.params?.gameNumber) || 1);
   const [numberOfGames, setNumberOfGames] = useState(
     Math.max(1, Number(tournament?.numberOfGames) || 1),
@@ -460,13 +462,26 @@ const LeaderboardScreen = ({ navigation, route }) => {
   });
   const [loading, setLoading] = useState(true);
 
+  const handleBackNavigation = useCallback(() => {
+    if (fromActiveGame) {
+      navigation.reset({
+        index: 0,
+        routes: [{ name: 'MainApp' }],
+      });
+    } else if (navigation.canGoBack()) {
+      navigation.goBack();
+    } else {
+      navigation.reset({
+        index: 0,
+        routes: [{ name: 'MainApp' }],
+      });
+    }
+  }, [fromActiveGame, navigation]);
+
   const onBackPress = useCallback(() => {
-    navigation.reset({
-      index: 0,
-      routes: [{ name: 'MainApp' }],
-    });
+    handleBackNavigation();
     return true;
-  }, [navigation]);
+  }, [handleBackNavigation]);
 
   const loadLeaderboard = useCallback(async () => {
     if (!tournamentId || !isUuid(String(tournamentId))) {
@@ -529,13 +544,6 @@ const LeaderboardScreen = ({ navigation, route }) => {
     }, [onBackPress, loadLeaderboard])
   );
 
-  const handleBackToHome = () => {
-    navigation.reset({
-      index: 0,
-      routes: [{ name: 'MainApp' }],
-    });
-  };
-
   const isChallenge = String(meta.playMode || playMode).toLowerCase().includes('challenge');
   const modeLabel = isChallenge ? 'Challenge' : 'Practice';
 
@@ -555,7 +563,7 @@ const LeaderboardScreen = ({ navigation, route }) => {
           {/* Back Button */}
           <TouchableOpacity
             style={styles.backButtonCircle}
-            onPress={handleBackToHome}
+            onPress={handleBackNavigation}
             activeOpacity={0.7}
           >
             <AuthIcon name="chevron-left" size={moderateScale(22)} color="#093A24" />
@@ -694,13 +702,15 @@ const LeaderboardScreen = ({ navigation, route }) => {
             </>
           )}
 
-          <TouchableOpacity
-            style={styles.backHomeBtn}
-            onPress={handleBackToHome}
-            activeOpacity={0.85}
-          >
-            <Text style={styles.backHomeBtnText}>BACK TO HOME</Text>
-          </TouchableOpacity>
+          {fromActiveGame ? (
+            <TouchableOpacity
+              style={styles.backHomeBtn}
+              onPress={handleBackNavigation}
+              activeOpacity={0.85}
+            >
+              <Text style={styles.backHomeBtnText}>BACK TO HOME</Text>
+            </TouchableOpacity>
+          ) : null}
           <View style={{ height: hp(4) }} />
         </View>
       </ScrollView>

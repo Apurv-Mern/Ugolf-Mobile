@@ -1527,7 +1527,7 @@
 
 // export default ActiveGameScreen;
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import {
   View,
   Text,
@@ -1593,10 +1593,10 @@ const ActiveGameScreen = ({ navigation, route }) => {
 
   const [activeSessionId, setActiveSessionId] = useState(
     route?.params?.sessionId ||
-      initialSessionData?.play?.sessionId ||
-      initialSessionData?.sessionId ||
-      initialSessionData?.id ||
-      "",
+    initialSessionData?.play?.sessionId ||
+    initialSessionData?.sessionId ||
+    initialSessionData?.id ||
+    "",
   );
 
   const [playScreen, setPlayScreen] = useState("QUESTIONS"); // QUESTIONS | INSTRUCTION | FINISHED
@@ -1628,9 +1628,15 @@ const ActiveGameScreen = ({ navigation, route }) => {
   });
 
   const [showGameEndModal, setShowGameEndModal] = useState(false);
+  const gameEndModalDismissedRef = useRef(false);
   const [nextGameNumber, setNextGameNumber] = useState(null);
   const [actionLoading, setActionLoading] = useState(false);
   const [canGoBack, setCanGoBack] = useState(false);
+
+  const dismissGameEndModal = useCallback(() => {
+    gameEndModalDismissedRef.current = true;
+    setShowGameEndModal(false);
+  }, []);
 
   const canCallSessionApi =
     tournamentId &&
@@ -1639,12 +1645,12 @@ const ActiveGameScreen = ({ navigation, route }) => {
     isUuid(String(activeSessionId));
 
   const exitToHome = useCallback(() => {
-    setShowGameEndModal(false);
+    dismissGameEndModal();
     navigation.reset({
       index: 0,
       routes: [{ name: "MainApp" }],
     });
-  }, [navigation]);
+  }, [dismissGameEndModal, navigation]);
 
   const confirmLeaveGame = useCallback(() => {
     Alert.alert(
@@ -1796,23 +1802,25 @@ const ActiveGameScreen = ({ navigation, route }) => {
           playData.isFinished ||
           playData.status === "FINISHED"
         ) {
-          setShowGameEndModal(true);
-          AsyncStorage.removeItem("@ugolf_active_game_session").catch(() => {});
+          if (!gameEndModalDismissedRef.current) {
+            setShowGameEndModal(true);
+          }
+          AsyncStorage.removeItem("@ugolf_active_game_session").catch(() => { });
         } else if (sId && (tournamentId || playData.tournamentId)) {
           try {
             const safeTournament = tournament
               ? {
-                  id: tournament.id || tournament._id,
-                  _id: tournament._id || tournament.id,
-                  title: tournament.title || tournament.name || "Tournament",
-                  name: tournament.name || tournament.title || "Tournament",
-                  golfCourseName:
-                    tournament.golfCourseName || tournament.location || "",
-                  playMode: tournament.playMode || playModeParam,
-                  numberOfGames: tournament.numberOfGames || 1,
-                  holeStart: tournament.holeStart || 1,
-                  holeEnd: tournament.holeEnd || 18,
-                }
+                id: tournament.id || tournament._id,
+                _id: tournament._id || tournament.id,
+                title: tournament.title || tournament.name || "Tournament",
+                name: tournament.name || tournament.title || "Tournament",
+                golfCourseName:
+                  tournament.golfCourseName || tournament.location || "",
+                playMode: tournament.playMode || playModeParam,
+                numberOfGames: tournament.numberOfGames || 1,
+                holeStart: tournament.holeStart || 1,
+                holeEnd: tournament.holeEnd || 18,
+              }
               : null;
 
             AsyncStorage.setItem(
@@ -1824,7 +1832,7 @@ const ActiveGameScreen = ({ navigation, route }) => {
                 playModeParam,
                 timestamp: Date.now(),
               }),
-            ).catch(() => {});
+            ).catch(() => { });
           } catch (e) {
             console.log("AsyncStorage save active session error:", e);
           }
@@ -1884,6 +1892,7 @@ const ActiveGameScreen = ({ navigation, route }) => {
   }, [canCallSessionApi, tournamentId, activeSessionId, parseSessionState]);
 
   useEffect(() => {
+    gameEndModalDismissedRef.current = false;
     if (initialSessionData) {
       parseSessionState(initialSessionData);
     } else if (canCallSessionApi) {
@@ -1954,7 +1963,7 @@ const ActiveGameScreen = ({ navigation, route }) => {
           data?.nextGameNumber != null ? Number(data.nextGameNumber) : null;
         setNextGameNumber(Number.isFinite(next) ? next : null);
       })
-      .catch(() => {});
+      .catch(() => { });
 
     return () => {
       cancelled = true;
@@ -2045,7 +2054,7 @@ const ActiveGameScreen = ({ navigation, route }) => {
   };
 
   const handleCheckScore = () => {
-    setShowGameEndModal(false);
+    dismissGameEndModal();
     navigation.navigate("Leaderboard", {
       tournament,
       selectedTeam,
@@ -2053,15 +2062,16 @@ const ActiveGameScreen = ({ navigation, route }) => {
       playMode: playModeParam,
       gameNumber: playMeta.gameNumber || route?.params?.gameNumber || 1,
       sessionId: activeSessionId,
+      fromActiveGame: true,
     });
   };
 
   const handleStartNextGame = () => {
     if (nextGameNumber == null) return;
-    setShowGameEndModal(false);
+    dismissGameEndModal();
     const playMode =
       String(playModeParam || playMeta.playMode || "practice").toLowerCase() ===
-      "challenge"
+        "challenge"
         ? "challenge"
         : "practice";
     navigation.replace("SelectGame", {
@@ -2154,10 +2164,9 @@ const ActiveGameScreen = ({ navigation, route }) => {
               ellipsizeMode="tail"
             >
               {subtitle ||
-                `Game 1 · ${
-                  String(playModeParam).toLowerCase() === "practice"
-                    ? "Practice"
-                    : "Challenge"
+                `Game 1 · ${String(playModeParam).toLowerCase() === "practice"
+                  ? "Practice"
+                  : "Challenge"
                 }`}
             </Text>
           </View>
@@ -2187,15 +2196,15 @@ const ActiveGameScreen = ({ navigation, route }) => {
           <Text style={styles.scoreLabel}>Your Score</Text>
         </View>
 
-        {/* Map Section */}
-        <View style={styles.mapSection}>
+        {/* Map Section - Commented out for now */}
+        {/* <View style={styles.mapSection}>
           <HoleMap
             key={`active-hole-map-${holeNumber}-${activeSessionId}`}
             mapData={mapData}
             holeNumber={holeNumber}
             compact
           />
-        </View>
+        </View> */}
 
         {/* Loading Indicator */}
         {actionLoading ? (
@@ -2404,13 +2413,13 @@ const ActiveGameScreen = ({ navigation, route }) => {
         visible={showGameEndModal}
         transparent
         animationType="fade"
-        onRequestClose={() => setShowGameEndModal(false)}
+        onRequestClose={dismissGameEndModal}
       >
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <TouchableOpacity
               style={styles.modalCloseCross}
-              onPress={() => setShowGameEndModal(false)}
+              onPress={dismissGameEndModal}
               activeOpacity={0.7}
             >
               <AuthIcon name="x" size={moderateScale(18)} color="#093A24" />

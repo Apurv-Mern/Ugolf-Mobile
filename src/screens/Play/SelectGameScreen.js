@@ -758,10 +758,17 @@ const SelectGameScreen = ({ navigation, route }) => {
     };
   }, []);
 
+  const handleBackNavigation = useCallback(() => {
+    navigation.reset({
+      index: 0,
+      routes: [{ name: 'MainApp' }],
+    });
+  }, [navigation]);
+
   useFocusEffect(
     useCallback(() => {
       const onBackPress = () => {
-        navigation.goBack();
+        handleBackNavigation();
         return true;
       };
       const subscription = BackHandler.addEventListener(
@@ -769,7 +776,7 @@ const SelectGameScreen = ({ navigation, route }) => {
         onBackPress,
       );
       return () => subscription.remove();
-    }, [navigation]),
+    }, [handleBackNavigation]),
   );
 
   // Game list (course + nine per game) comes from the same config the creator saved.
@@ -1148,7 +1155,7 @@ const SelectGameScreen = ({ navigation, route }) => {
       <StatusBar translucent backgroundColor="transparent" barStyle="dark-content" />
 
       <View style={styles.headerBlock}>
-        <CircularBackButton onPress={() => navigation.goBack()} />
+        <CircularBackButton onPress={handleBackNavigation} />
         <ScreenHeader
           title="Select Game"
           subtitle="Check everyone is ready, then pick the nine you want to play"
