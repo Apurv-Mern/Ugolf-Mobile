@@ -1562,10 +1562,6 @@ import {
   backSessionStepApi,
 } from "../../services/playService";
 import { formatPlayLocationLabel } from "../../utils/playLocationLabel";
-import {
-  isNoneOfTheAboveOption,
-  NONE_OF_THESE_PLAY_ANOTHER_SHOT_LABEL,
-} from "../../utils/shotFlowOptionLabel";
 
 const trophyImg = require("../../assets/Images/ trophy.png");
 
@@ -1614,9 +1610,6 @@ const ActiveGameScreen = ({ navigation, route }) => {
   const [hiddenQuestionCount, setHiddenQuestionCount] = useState(0);
   const [allowNo, setAllowNo] = useState(true);
   const [instructionText, setInstructionText] = useState("");
-  const [noneOfTheseLabel, setNoneOfTheseLabel] = useState(
-    "None of these — play another shot",
-  );
   const [mapData, setMapData] = useState(emptyMap);
   const [playMeta, setPlayMeta] = useState({
     tournamentName: tournament?.title || tournament?.name || "Tournament",
@@ -1718,12 +1711,6 @@ const ActiveGameScreen = ({ navigation, route }) => {
         if (playData.instructionText != null) {
           setInstructionText(playData.instructionText);
         }
-        if (playData.noneOfTheseLabel) {
-          setNoneOfTheseLabel(playData.noneOfTheseLabel);
-        } else if (playData.answerMode === "YES_ONLY") {
-          setNoneOfTheseLabel("None of these — play another shot");
-        }
-
         setPlayMeta((prev) => ({
           tournamentName:
             playData.tournamentName ||
@@ -1991,7 +1978,7 @@ const ActiveGameScreen = ({ navigation, route }) => {
     );
   };
 
-  const handleAnswerNo = async () => {
+  const handleAnswerNo = async (questionId) => {
     if (!canCallSessionApi) {
       Toast.show({
         type: "error",
@@ -2000,10 +1987,16 @@ const ActiveGameScreen = ({ navigation, route }) => {
       });
       return;
     }
+    const qid = typeof questionId === "string" ? questionId : undefined;
     const prevShot = shotNumber;
     try {
       setActionLoading(true);
-      const res = await answerNoSessionApi(tournamentId, activeSessionId, {});
+      const payload = qid ? { questionId: qid } : {};
+      const res = await answerNoSessionApi(
+        tournamentId,
+        activeSessionId,
+        payload,
+      );
       parseSessionState(res);
       const playData = res?.play || res?.session || res?.gameSession || res;
       const newShot = playData?.currentShot ?? playData?.shotNumber;
@@ -2224,21 +2217,7 @@ const ActiveGameScreen = ({ navigation, route }) => {
               <View style={styles.questionCard}>
                 {questionList.map((qItem, idx) => {
                   const qId = qItem.id || qItem._id || qItem.questionId;
-                  if (isNoneOfTheAboveOption(qItem)) {
-                    return (
-                      <TouchableOpacity
-                        key={qId || `q-none-${idx}`}
-                        style={styles.noneOfTheseBtn}
-                        onPress={() => handleAnswerYes(qId)}
-                        disabled={actionLoading}
-                        activeOpacity={0.88}
-                      >
-                        <Text style={styles.noneOfTheseBtnText}>
-                          {NONE_OF_THESE_PLAY_ANOTHER_SHOT_LABEL}
-                        </Text>
-                      </TouchableOpacity>
-                    );
-                  }
+                  const rowAllowNo = qItem.allowNo === true;
                   return (
                     <View
                       key={qId || `q-${idx}`}
@@ -2247,30 +2226,38 @@ const ActiveGameScreen = ({ navigation, route }) => {
                       <Text style={styles.yesOnlyQuestionText}>
                         {qItem.text || qItem.question}
                       </Text>
-                      <TouchableOpacity
-                        style={styles.yesOnlyFullBtn}
-                        onPress={() => handleAnswerYes(qId)}
-                        disabled={actionLoading}
-                        activeOpacity={0.85}
-                      >
-                        <Text style={styles.yesOnlyFullBtnText}>YES</Text>
-                      </TouchableOpacity>
+                      {rowAllowNo ? (
+                        <View style={styles.yesNoRow}>
+                          <TouchableOpacity
+                            style={styles.yesBtn}
+                            onPress={() => handleAnswerYes(qId)}
+                            disabled={actionLoading}
+                            activeOpacity={0.85}
+                          >
+                            <Text style={styles.yesBtnText}>Yes</Text>
+                          </TouchableOpacity>
+                          <TouchableOpacity
+                            style={styles.noBtn}
+                            onPress={() => handleAnswerNo(qId)}
+                            disabled={actionLoading}
+                            activeOpacity={0.85}
+                          >
+                            <Text style={styles.noBtnText}>No</Text>
+                          </TouchableOpacity>
+                        </View>
+                      ) : (
+                        <TouchableOpacity
+                          style={styles.yesOnlyFullBtn}
+                          onPress={() => handleAnswerYes(qId)}
+                          disabled={actionLoading}
+                          activeOpacity={0.85}
+                        >
+                          <Text style={styles.yesOnlyFullBtnText}>YES</Text>
+                        </TouchableOpacity>
+                      )}
                     </View>
                   );
                 })}
-
-                {allowNo ? (
-                  <TouchableOpacity
-                    style={styles.noneOfTheseBtn}
-                    onPress={handleAnswerNo}
-                    disabled={actionLoading}
-                    activeOpacity={0.88}
-                  >
-                    <Text style={styles.noneOfTheseBtnText}>
-                      {noneOfTheseLabel}
-                    </Text>
-                  </TouchableOpacity>
-                ) : null}
               </View>
             ) : (
               <View style={styles.questionCard}>
@@ -2292,7 +2279,7 @@ const ActiveGameScreen = ({ navigation, route }) => {
                   {allowNo ? (
                     <TouchableOpacity
                       style={styles.noBtn}
-                      onPress={handleAnswerNo}
+                      onPress={() => handleAnswerNo(activeQuestionId)}
                       disabled={actionLoading}
                       activeOpacity={0.85}
                     >
@@ -2319,7 +2306,7 @@ const ActiveGameScreen = ({ navigation, route }) => {
               {allowNo ? (
                 <TouchableOpacity
                   style={styles.nextShotBtn}
-                  onPress={handleAnswerNo}
+                  onPress={() => handleAnswerNo()}
                   disabled={actionLoading}
                   activeOpacity={0.88}
                 >
