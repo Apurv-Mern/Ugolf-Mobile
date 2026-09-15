@@ -627,7 +627,7 @@ const LoginScreen = ({ navigation }) => {
       Toast.show({
         type: 'success',
         text1: 'Login Successful',
-        text2: response?.message || 'Welcome back to UGolf!',
+        text2: response?.message || 'Welcome back to Universal Golf!',
       });
 
       // Login always goes directly to MainApp.

@@ -971,7 +971,7 @@ const SignUpScreen = ({ navigation }) => {
       Toast.show({
         type: 'success',
         text1: 'Registration Successful',
-        text2: response?.message || 'Welcome to UGolf!',
+        text2: response?.message || 'Welcome to Universal Golf!',
       });
 
       if (response?.accessToken) {
@@ -1211,7 +1211,7 @@ const SignUpScreen = ({ navigation }) => {
                 >
                   Privacy Policy
                 </Text>{' '}
-                of UGolf.
+                of Universal Golf.
               </Text>
             </View>
             {errors.agreeTerms && (

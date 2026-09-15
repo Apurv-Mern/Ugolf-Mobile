@@ -17,21 +17,21 @@ const PrivacyPolicyScreen = () => {
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
       <StatusBar barStyle="dark-content" backgroundColor="#F0F4F0" />
-      
+
       {/* Header Container */}
       <View style={styles.header}>
         <BackButton style={styles.backButton} iconColor="#093A24" />
         <Text style={styles.headerTitle}>Privacy Policy</Text>
       </View>
 
-      <ScrollView 
-        contentContainerStyle={styles.scrollContent} 
+      <ScrollView
+        contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
         <Text style={styles.lastUpdated}>Last Updated: July 2026</Text>
 
         <Text style={styles.paragraph}>
-          At UGolf, we value your privacy and are committed to protecting your personal data. This Privacy Policy describes how we collect, use, and share your information when you use our application.
+          At Universal Golf, we value your privacy and are committed to protecting your personal data. This Privacy Policy describes how we collect, use, and share your information when you use our application.
         </Text>
 
         <View style={styles.section}>
@@ -51,7 +51,7 @@ const PrivacyPolicyScreen = () => {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>3. Location Sharing</Text>
           <Text style={styles.sectionText}>
-            UGolf may request access to your device location in order to display nearest courses, measure distances on holes, and support tracking functions. You can control location sharing inside your device system settings.
+            Universal Golf may request access to your device location in order to display nearest courses, measure distances on holes, and support tracking functions. You can control location sharing inside your device system settings.
           </Text>
         </View>
 
@@ -65,7 +65,7 @@ const PrivacyPolicyScreen = () => {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>5. Contact Support</Text>
           <Text style={styles.sectionText}>
-            If you have questions about this policy, or want to request account or data removal, please reach out to us at privacy@ugolf.com.
+            If you have questions about this policy, or want to request account or data removal, please reach out to us at privacy@universalgolf.com.
           </Text>
         </View>
       </ScrollView>

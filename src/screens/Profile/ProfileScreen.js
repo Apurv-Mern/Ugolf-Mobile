@@ -1193,7 +1193,7 @@ const ProfileScreen = ({ navigation }) => {
           <TouchableOpacity
             style={styles.accountRow}
             onPress={() =>
-              Linking.openURL('https://universalgolf-owner.com/privacy-policy.html').catch(() => {})
+              Linking.openURL('https://universalgolf-owner.com/privacy-policy.html').catch(() => { })
             }
             activeOpacity={0.7}
           >
@@ -1284,7 +1284,7 @@ const ProfileScreen = ({ navigation }) => {
         ====================================================== */}
 
         {/* <Text style={styles.versionText}>
-          UGolf v2.4.0
+          Universal Golf v2.4.0
         </Text> */}
 
 
