@@ -2189,15 +2189,16 @@ const ActiveGameScreen = ({ navigation, route }) => {
           <Text style={styles.scoreLabel}>Your Score</Text>
         </View>
 
-        {/* Map Section - Commented out for now */}
-        {/* <View style={styles.mapSection}>
+        {/* Map Section - Distance Only (Map hidden) */}
+        <View style={styles.mapSection}>
           <HoleMap
             key={`active-hole-map-${holeNumber}-${activeSessionId}`}
             mapData={mapData}
             holeNumber={holeNumber}
             compact
+            distanceOnly={true}
           />
-        </View> */}
+        </View>
 
         {/* Loading Indicator */}
         {actionLoading ? (

@@ -209,6 +209,25 @@ const AuthIcon = ({ name, size = 20, color = '#888888', style = {} }) => {
         </Svg>
       );
 
+    case 'target':
+      return (
+        <Svg
+          width={size}
+          height={size}
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke={color}
+          strokeWidth={strokeWidth}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          style={style}
+        >
+          <Circle cx="12" cy="12" r="10" />
+          <Circle cx="12" cy="12" r="6" />
+          <Circle cx="12" cy="12" r="2" />
+        </Svg>
+      );
+
     case 'flag':
       return (
         <Svg

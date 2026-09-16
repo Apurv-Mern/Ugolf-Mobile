@@ -472,6 +472,7 @@ import {
   RESULTS,
 } from 'react-native-permissions';
 
+import AuthIcon from '../common/AuthIcon';
 import { COLORS } from '../../theme/colors';
 import { FONTS } from '../../theme/fonts';
 import { hp, wp, fontSize, moderateScale } from '../../utils/responsive';
@@ -493,10 +494,9 @@ const haversineMeters = (a, b) => {
 };
 
 const formatDistance = (meters) => {
-  // const yards = meters * 1.09361;
-  // if (yards < 30) return `${Math.round(yards)} yd`;
-  // return `${Math.round(yards)} yd (${Math.round(meters)} m)`;
-  return `${Math.round(meters)} m`;
+  if (!Number.isFinite(Number(meters))) return 'Unavailable';
+  const val = Math.round(meters);
+  return `${val.toLocaleString('en-US')} m`;
 };
 
 const poiLabel = (poi) => {
@@ -556,7 +556,7 @@ const requestLocationPermission = async () => {
  * The play API remains the source of truth for hole POIs; device location is
  * only used for the player puck, distance and display-only proximity hints.
  */
-const HoleMap = ({ mapData, holeNumber, compact = false }) => {
+const HoleMap = ({ mapData, holeNumber, compact = false, distanceOnly = false }) => {
   const cameraRef = useRef(null);
   const [mapReady, setMapReady] = useState(false);
   const [locationGranted, setLocationGranted] = useState(false);
@@ -597,6 +597,7 @@ const HoleMap = ({ mapData, holeNumber, compact = false }) => {
   }, [points]);
 
   useEffect(() => {
+    let listener = null;
     requestLocationPermission()
       .then((granted) => {
         setLocationGranted(granted);
@@ -604,6 +605,9 @@ const HoleMap = ({ mapData, holeNumber, compact = false }) => {
           setGeoError(null);
           try {
             Mapbox.locationManager.start();
+            if (typeof Mapbox.locationManager.addListener === 'function') {
+              listener = Mapbox.locationManager.addListener(handleLocationUpdate);
+            }
           } catch (e) {
             console.log('Location manager start error:', e);
           }
@@ -622,10 +626,13 @@ const HoleMap = ({ mapData, holeNumber, compact = false }) => {
 
     return () => {
       try {
+        if (listener && typeof listener.remove === 'function') {
+          listener.remove();
+        }
         Mapbox.locationManager.stop();
       } catch (e) { }
     };
-  }, []);
+  }, [frameHole, handleLocationUpdate]);
 
   useEffect(() => {
     const timer1 = setTimeout(() => {
@@ -675,6 +682,26 @@ const HoleMap = ({ mapData, holeNumber, compact = false }) => {
       : null;
 
   const displayDistance = distanceToGreen ?? teeToGreenDistance;
+
+  if (distanceOnly) {
+    const formattedVal = displayDistance != null ? formatDistance(displayDistance) : 'Unavailable';
+    return (
+      <View style={styles.distanceCard}>
+        <View style={styles.distanceLeftGroup}>
+          <View style={styles.distanceIconCircle}>
+            <AuthIcon name="target" size={moderateScale(15)} color="#093A24" />
+          </View>
+          <View style={styles.distanceTextCol}>
+            <Text style={styles.distanceLabel}>TO GREEN</Text>
+            {/* <Text style={styles.distanceSubText}>Live GPS Distance</Text> */}
+          </View>
+        </View>
+        <Text style={styles.distanceValueText} numberOfLines={1}>
+          {formattedVal}
+        </Text>
+      </View>
+    );
+  }
 
   const holeAnchor = mapData?.green || mapData?.tee || null;
   const playerNearCourse =
@@ -765,7 +792,7 @@ const HoleMap = ({ mapData, holeNumber, compact = false }) => {
         </Text>
       ) : null}
 
-      <View style={[styles.mapClip, compact && styles.mapClipCompact]}>
+      <View style={[styles.mapClip, compact && styles.mapClipCompact, distanceOnly && styles.mapClipHidden]}>
         <Mapbox.MapView
           style={styles.map}
           styleURL={MAPBOX_STYLE_URL}
@@ -881,6 +908,55 @@ const styles = StyleSheet.create({
     color: '#718096',
     textAlign: 'right',
   },
+  distanceCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#093A24',
+    borderRadius: moderateScale(16),
+    paddingHorizontal: wp(4),
+    paddingVertical: hp(1.2),
+    marginTop: hp(1.5),
+    borderWidth: 1.5,
+    borderColor: '#BCFF00',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 6,
+    elevation: 3,
+  },
+  distanceLeftGroup: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: wp(2.5),
+  },
+  distanceIconCircle: {
+    width: moderateScale(32),
+    height: moderateScale(32),
+    borderRadius: moderateScale(16),
+    backgroundColor: '#BCFF00',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  distanceTextCol: {
+    justifyContent: 'center',
+  },
+  distanceLabel: {
+    fontFamily: FONTS.bold,
+    fontSize: fontSize(15),
+    color: '#BCFF00',
+    letterSpacing: 0.5,
+  },
+  distanceSubText: {
+    fontFamily: FONTS.medium,
+    fontSize: fontSize(9),
+    color: 'rgba(255, 255, 255, 0.7)',
+  },
+  distanceValueText: {
+    fontFamily: FONTS.bold,
+    fontSize: fontSize(18),
+    color: COLORS.white,
+  },
   mapClip: {
     height: hp(32),
     overflow: 'hidden',
@@ -890,6 +966,14 @@ const styles = StyleSheet.create({
   },
   mapClipCompact: {
     height: hp(24),
+  },
+  mapClipHidden: {
+    height: 0,
+    opacity: 0,
+    overflow: 'hidden',
+    borderWidth: 0,
+    marginTop: 0,
+    marginBottom: 0,
   },
   map: {
     flex: 1,
