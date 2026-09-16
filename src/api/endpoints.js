@@ -1,8 +1,8 @@
 // const BASE_URL = 'https://ugolf-backend.24livehost.com:5011';
-// const BASE_URL = 'https://ugolf-backend.24livehost.com';
+const BASE_URL = 'https://ugolf-backend.24livehost.com';
 // const BASE_URL = 'http://localhost:4000'; // works on iOS simulator only
 // const BASE_URL = 'http://192.168.10.186:4000'; // physical device on same Wi‑Fi
-const BASE_URL = "http://10.0.2.2:4000"; // Android emulator → host machine localhost:4000
+// const BASE_URL = "http://10.0.2.2:4000"; // Android emulator → host machine localhost:4000
 
 export const ENDPOINTS = {
   LOGIN: "/api/v1/mobile/auth/login",
