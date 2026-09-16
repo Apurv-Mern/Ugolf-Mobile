@@ -450,7 +450,7 @@
 
 
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -481,7 +481,6 @@ import { useDispatch } from 'react-redux';
 import { loginApi } from '../../services/authService';
 import { setLoginData } from '../../redux/slices/authSlice';
 import { setStorageData, getStorageData, removeStorageData } from '../../storage/storage';
-import { useEffect } from 'react';
 
 const LoginScreen = ({ navigation }) => {
   const dispatch = useDispatch();
@@ -490,6 +489,23 @@ const LoginScreen = ({ navigation }) => {
   const [rememberMe, setRememberMe] = useState(false);
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState({});
+  const navLockRef = useRef(false);
+  const timerRef = useRef(null);
+
+  useEffect(() => {
+    return () => {
+      if (timerRef.current) clearTimeout(timerRef.current);
+    };
+  }, []);
+
+  const safeNavigate = (routeName, params) => {
+    if (!navigation.isFocused() || navLockRef.current) return;
+    navLockRef.current = true;
+    navigation.navigate(routeName, params);
+    setTimeout(() => {
+      navLockRef.current = false;
+    }, 1000);
+  };
 
   useEffect(() => {
     const loadRememberedEmail = async () => {
@@ -505,6 +521,7 @@ const LoginScreen = ({ navigation }) => {
 
   useEffect(() => {
     const unsubscribeFocus = navigation.addListener('focus', async () => {
+      navLockRef.current = false;
       setErrors({});
       // Reload remembered credentials
       const savedEmail = await getStorageData('REMEMBERED_EMAIL');
@@ -564,10 +581,12 @@ const LoginScreen = ({ navigation }) => {
   };
 
   const handleLogin = async () => {
+    if (loading || navLockRef.current) return;
     if (!validateForm()) {
       return;
     }
 
+    navLockRef.current = true;
     setLoading(true);
     try {
       const response = await loginApi({
@@ -632,7 +651,7 @@ const LoginScreen = ({ navigation }) => {
 
       // Login always goes directly to MainApp.
       // Subscription screen is only shown after new registration (not on login).
-      setTimeout(() => {
+      timerRef.current = setTimeout(() => {
         navigation.reset({
           index: 0,
           routes: [{ name: 'MainApp' }],
@@ -745,7 +764,7 @@ const LoginScreen = ({ navigation }) => {
               </TouchableOpacity>
 
               <TouchableOpacity
-                onPress={() => navigation.navigate('ForgotPassword')}
+                onPress={() => safeNavigate('ForgotPassword')}
                 activeOpacity={0.7}
               >
                 <Text style={styles.forgotText}>Forgot Password?</Text>
@@ -764,7 +783,7 @@ const LoginScreen = ({ navigation }) => {
             <View style={styles.registerRow}>
               <Text style={styles.newText}>New to Universal Golf?</Text>
               <TouchableOpacity
-                onPress={() => navigation.navigate('SignUp')}
+                onPress={() => safeNavigate('SignUp')}
                 activeOpacity={0.7}
               >
                 <Text style={styles.registerText}>Create Account</Text>

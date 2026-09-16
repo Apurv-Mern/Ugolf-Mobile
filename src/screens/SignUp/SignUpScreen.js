@@ -711,7 +711,7 @@
 
 
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
   View,
   Text,
@@ -764,9 +764,24 @@ const SignUpScreen = ({ navigation }) => {
   const [agreeTerms, setAgreeTerms] = useState(false);
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState({});
+  const navLockRef = useRef(false);
+
+  const safeLoginNavigate = () => {
+    if (!navigation.isFocused() || navLockRef.current) return;
+    navLockRef.current = true;
+    if (navigation.canGoBack()) {
+      navigation.goBack();
+    } else {
+      navigation.navigate('Login');
+    }
+    setTimeout(() => {
+      navLockRef.current = false;
+    }, 1000);
+  };
 
   useEffect(() => {
     const unsubscribeFocus = navigation.addListener('focus', () => {
+      navLockRef.current = false;
       setErrors({});
       setFirstName('');
       setLastName('');
@@ -946,10 +961,12 @@ const SignUpScreen = ({ navigation }) => {
   };
 
   const handleSignUp = async () => {
+    if (loading || navLockRef.current) return;
     if (!validateForm()) {
       return;
     }
 
+    navLockRef.current = true;
     setLoading(true);
     try {
       const response = await registerApi({
@@ -1232,13 +1249,7 @@ const SignUpScreen = ({ navigation }) => {
             <View style={styles.loginRow}>
               <Text style={styles.alreadyText}>Already A Member?</Text>
               <TouchableOpacity
-                onPress={() => {
-                  if (navigation.canGoBack()) {
-                    navigation.goBack();
-                  } else {
-                    navigation.navigate('Login');
-                  }
-                }}
+                onPress={safeLoginNavigate}
                 activeOpacity={0.7}
               >
                 <Text style={styles.loginText}>Login</Text>
