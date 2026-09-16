@@ -463,7 +463,7 @@ import React, {
   useRef,
   useState,
 } from 'react';
-import { Platform, StyleSheet, Text, View } from 'react-native';
+import { Platform, StyleSheet, Text, View, AppState } from 'react-native';
 import Mapbox from '@rnmapbox/maps';
 import {
   check,
@@ -598,39 +598,63 @@ const HoleMap = ({ mapData, holeNumber, compact = false, distanceOnly = false })
 
   useEffect(() => {
     let listener = null;
-    requestLocationPermission()
-      .then((granted) => {
-        setLocationGranted(granted);
-        if (granted) {
-          setGeoError(null);
-          try {
-            Mapbox.locationManager.start();
-            if (typeof Mapbox.locationManager.addListener === 'function') {
-              listener = Mapbox.locationManager.addListener(handleLocationUpdate);
-            }
-          } catch (e) {
-            console.log('Location manager start error:', e);
-          }
-        } else {
-          setGeoError('Location permission denied');
-        }
-        // Force map re-frame when permission modal dismisses
-        setTimeout(() => {
-          frameHole();
-        }, 200);
-        setTimeout(() => {
-          frameHole();
-        }, 600);
-      })
-      .catch(() => setGeoError('Location unavailable'));
+    let isSubscribed = true;
 
-    return () => {
+    const startLocationManager = () => {
+      try {
+        Mapbox.locationManager.start();
+        if (typeof Mapbox.locationManager.addListener === 'function' && !listener) {
+          listener = Mapbox.locationManager.addListener(handleLocationUpdate);
+        }
+      } catch (e) {
+        console.log('Location manager start error:', e);
+      }
+    };
+
+    const stopLocationManager = () => {
       try {
         if (listener && typeof listener.remove === 'function') {
           listener.remove();
+          listener = null;
         }
         Mapbox.locationManager.stop();
       } catch (e) { }
+    };
+
+    requestLocationPermission()
+      .then((granted) => {
+        if (!isSubscribed) return;
+        setLocationGranted(granted);
+        if (granted) {
+          setGeoError(null);
+          startLocationManager();
+        } else {
+          setGeoError('Location permission denied');
+        }
+        setTimeout(() => {
+          if (isSubscribed) frameHole();
+        }, 200);
+        setTimeout(() => {
+          if (isSubscribed) frameHole();
+        }, 600);
+      })
+      .catch(() => {
+        if (isSubscribed) setGeoError('Location unavailable');
+      });
+
+    // Pause location updates when app goes to background; resume when active
+    const appStateSub = AppState.addEventListener('change', (nextAppState) => {
+      if (nextAppState === 'active') {
+        startLocationManager();
+      } else if (nextAppState === 'background' || nextAppState === 'inactive') {
+        stopLocationManager();
+      }
+    });
+
+    return () => {
+      isSubscribed = false;
+      appStateSub.remove();
+      stopLocationManager();
     };
   }, [frameHole, handleLocationUpdate]);
 
