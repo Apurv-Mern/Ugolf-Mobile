@@ -19,7 +19,10 @@ export function formatPlayLocationLabel(input) {
     return "Fairway";
   }
 
-  if (par === 5 && stage === "FAIRWAY_SECOND_SHOT") {
+  if (
+    par === 5 &&
+    (stage === "FAIRWAY_SECOND_SHOT" || stage === "FAIRWAY_THIRD_SHOT")
+  ) {
     return "Fairway";
   }
 
