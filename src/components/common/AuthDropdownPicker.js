@@ -32,16 +32,31 @@ const AuthDropdownPicker = ({
 }) => {
   const [modalVisible, setModalVisible] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const isPressingRef = React.useRef(false);
 
-  const filteredOptions = options.filter(item => {
+  const filteredOptions = (Array.isArray(options) ? options : []).filter(item => {
     const labelText = item?.label || item?.name || '';
     return labelText.toLowerCase().includes(searchQuery.toLowerCase().trim());
   });
 
+  const handleOpenModal = () => {
+    if (disabled || modalVisible || isPressingRef.current) return;
+    isPressingRef.current = true;
+    setModalVisible(true);
+    setTimeout(() => {
+      isPressingRef.current = false;
+    }, 500);
+  };
+
   const handleItemPress = (item) => {
+    if (isPressingRef.current) return;
+    isPressingRef.current = true;
     onSelect(item);
     setModalVisible(false);
     setSearchQuery('');
+    setTimeout(() => {
+      isPressingRef.current = false;
+    }, 500);
   };
 
   return (
@@ -53,7 +68,7 @@ const AuthDropdownPicker = ({
           disabled && styles.containerDisabled,
           style,
         ]}
-        onPress={() => !disabled && setModalVisible(true)}
+        onPress={handleOpenModal}
         activeOpacity={disabled ? 1 : 0.75}
       >
         <AuthIcon

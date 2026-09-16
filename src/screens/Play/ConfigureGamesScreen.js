@@ -298,8 +298,11 @@ const ConfigureGamesScreen = ({ navigation, route }) => {
     });
   };
 
+  const modalLockRef = React.useRef(false);
+
   // Open course selection dropdown modal
   const openCourseDropdown = (gameIndex) => {
+    if (modalLockRef.current) return;
     if (!isCreator) return;
     if (isStarted) {
       Toast.show({
@@ -337,6 +340,7 @@ const ConfigureGamesScreen = ({ navigation, route }) => {
 
   // Open hole range selection dropdown modal
   const openHoleDropdown = (gameIndex) => {
+    if (modalLockRef.current) return;
     if (!isCreator) return;
     if (isStarted) {
       Toast.show({
@@ -382,6 +386,9 @@ const ConfigureGamesScreen = ({ navigation, route }) => {
 
   // Save / Continue
   const handleContinue = async () => {
+    if (saving || modalLockRef.current) return;
+    modalLockRef.current = true;
+    setTimeout(() => { modalLockRef.current = false; }, 500);
     if (!isCreator || isStarted) {
       // Invitee or Locked/Started mode: skip re-saving configuration, proceed directly
       if (!isCreator) {
