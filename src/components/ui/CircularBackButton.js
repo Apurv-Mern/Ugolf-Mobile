@@ -9,8 +9,15 @@ import { moderateScale } from '../../utils/responsive';
 /** Figma 48px circular back control. */
 const CircularBackButton = ({ onPress, style, iconColor = COLORS.textPrimary }) => {
   const navigation = useNavigation();
+  const isPressingRef = React.useRef(false);
 
   const handlePress = () => {
+    if (isPressingRef.current) return;
+    isPressingRef.current = true;
+    setTimeout(() => {
+      isPressingRef.current = false;
+    }, 750);
+
     if (onPress) onPress();
     else if (navigation.canGoBack()) navigation.goBack();
   };

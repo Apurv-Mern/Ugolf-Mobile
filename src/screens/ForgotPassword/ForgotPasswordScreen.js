@@ -238,7 +238,7 @@
 // export default ForgotPasswordScreen;
 
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -267,9 +267,11 @@ const ForgotPasswordScreen = ({ navigation }) => {
   const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState({});
+  const navLockRef = useRef(false);
 
   useEffect(() => {
     const unsubscribeFocus = navigation.addListener('focus', () => {
+      navLockRef.current = false;
       setEmail('');
       setErrors({});
     });
@@ -307,10 +309,12 @@ const ForgotPasswordScreen = ({ navigation }) => {
   };
 
   const handleResetLink = async () => {
+    if (loading || navLockRef.current) return;
     if (!validateForm()) {
       return;
     }
 
+    navLockRef.current = true;
     setLoading(true);
     try {
       const response = await forgotPasswordApi({

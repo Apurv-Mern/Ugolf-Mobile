@@ -603,7 +603,11 @@ const CreateTournamentScreen = ({ navigation, route }) => {
     }, [navigation])
   );
 
+  const pickerLockRef = useRef(false);
+
   const handleOpenDropdown = (type, currentOptions, setter) => {
+    if (pickerLockRef.current) return;
+    pickerLockRef.current = true;
     setDropdownSearchQuery('');
     setDropdownOptions(currentOptions);
     setDropdownCallback(() => (val) => {
@@ -612,6 +616,9 @@ const CreateTournamentScreen = ({ navigation, route }) => {
       if (type === 'state') setStateError('');
     });
     setActiveDropdown(type);
+    setTimeout(() => {
+      pickerLockRef.current = false;
+    }, 500);
   };
 
   // Open dynamic Country dropdown
@@ -773,6 +780,8 @@ const CreateTournamentScreen = ({ navigation, route }) => {
   };
 
   const handleOpenDatePicker = () => {
+    if (pickerLockRef.current) return;
+    pickerLockRef.current = true;
     if (!startDate) {
       const todayStr = formatDateString(new Date());
       setStartDate(todayStr);
@@ -788,9 +797,13 @@ const CreateTournamentScreen = ({ navigation, route }) => {
     }
     if (startDateError) setStartDateError('');
     setShowDatePicker(true);
+    setTimeout(() => {
+      pickerLockRef.current = false;
+    }, 500);
   };
 
   const handleCreateTournament = async () => {
+    if (submitting || pickerLockRef.current) return;
     if (isEditing && challengeLocked) {
       Toast.show({
         type: 'info',
@@ -800,6 +813,7 @@ const CreateTournamentScreen = ({ navigation, route }) => {
       navigation.goBack();
       return;
     }
+    pickerLockRef.current = true;
     setSubmissionError('');
     setTournamentNameError('');
     setDescriptionError('');

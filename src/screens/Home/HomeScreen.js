@@ -2318,6 +2318,7 @@ const HomeScreen = ({ navigation }) => {
   };
 
   const normalizeTournament = (t, idx, source) => {
+    if (!t || typeof t !== 'object') return null;
     const rawMode = String(t.playMode || t.mode || '').toUpperCase();
     const playMode = rawMode.includes('CHALLENGE')
       ? 'CHALLENGE'
@@ -2353,7 +2354,7 @@ const HomeScreen = ({ navigation }) => {
   const extractTournamentList = (res) => {
     const raw =
       res?.tournaments || res?.data?.tournaments || res?.data || (Array.isArray(res) ? res : []);
-    return Array.isArray(raw) ? raw : [];
+    return Array.isArray(raw) ? raw.filter(item => item && typeof item === 'object') : [];
   };
 
   const buildLiveRoundCard = useCallback(async (item) => {
@@ -2443,9 +2444,10 @@ const HomeScreen = ({ navigation }) => {
       const byId = new Map();
       extractTournamentList(mineRes).forEach((t, idx) => {
         const item = normalizeTournament(t, idx, 'mine');
-        byId.set(item.id, item);
+        if (item?.id) byId.set(item.id, item);
       });
       extractTournamentList(invitedRes).forEach((t, idx) => {
+        if (!t) return;
         const statusStr = String(
           t.inviteStatus || t.userStatus || t.myTeamStatus || t.teamInviteStatus || t.invite?.status || t.status || ''
         ).toUpperCase();
@@ -2462,11 +2464,11 @@ const HomeScreen = ({ navigation }) => {
         if (isPending) return;
 
         const item = normalizeTournament(t, idx, 'invited');
-        if (!byId.has(item.id)) byId.set(item.id, item);
+        if (item?.id && !byId.has(item.id)) byId.set(item.id, item);
       });
       extractTournamentList(playedRes).forEach((t, idx) => {
         const item = normalizeTournament(t, idx, 'played');
-        if (!byId.has(item.id)) byId.set(item.id, item);
+        if (item?.id && !byId.has(item.id)) byId.set(item.id, item);
       });
 
       const history =
