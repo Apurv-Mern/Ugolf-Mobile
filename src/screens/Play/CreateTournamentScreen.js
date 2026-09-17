@@ -805,6 +805,7 @@ const CreateTournamentScreen = ({ navigation, route }) => {
   const handleCreateTournament = async () => {
     if (submitting || pickerLockRef.current) return;
     if (isEditing && challengeLocked) {
+      pickerLockRef.current = false;
       Toast.show({
         type: 'info',
         text1: 'Challenge Locked',
@@ -866,6 +867,7 @@ const CreateTournamentScreen = ({ navigation, route }) => {
     }
 
     if (hasError) {
+      pickerLockRef.current = false;
       Toast.show({
         type: 'error',
         text1: 'Validation Error',
@@ -901,6 +903,7 @@ const CreateTournamentScreen = ({ navigation, route }) => {
       const resolvedClubName = golfClub && golfClub !== 'Select Golf Club' ? golfClub : (matchedClub?.clubName || matchedClub?.name || '');
 
       if (!resolvedClubId) {
+        pickerLockRef.current = false;
         Toast.show({
           type: 'error',
           text1: 'Golf Club Required',
@@ -1073,6 +1076,7 @@ const CreateTournamentScreen = ({ navigation, route }) => {
       });
     } finally {
       setSubmitting(false);
+      pickerLockRef.current = false;
     }
   };
 
