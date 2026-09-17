@@ -988,7 +988,7 @@ const EmailVerificationScreen = ({ navigation, route }) => {
         <BackButton iconColor="#093A24" />
 
         <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          behavior={undefined}
           style={styles.keyboardView}
         >
           <ScrollView
@@ -997,6 +997,7 @@ const EmailVerificationScreen = ({ navigation, route }) => {
             showsVerticalScrollIndicator={false}
             bounces={false}
             overScrollMode="never"
+            scrollEnabled={false}
           >
             <View style={styles.cardWrapper}>
 

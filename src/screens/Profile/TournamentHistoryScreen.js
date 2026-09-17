@@ -50,8 +50,6 @@ const TournamentHistoryScreen = ({ navigation }) => {
       const res = await getPlayerGameHistoryApi();
       const list = res?.history || res?.data?.history || res?.data || (Array.isArray(res) ? res : []);
       const rows = Array.isArray(list) ? list : [];
-
-      const readinessById = new Map();
       const ids = [
         ...new Set(
           rows
@@ -59,13 +57,18 @@ const TournamentHistoryScreen = ({ navigation }) => {
             .filter((id) => id && id.includes('-')),
         ),
       ];
-      await Promise.all(
+      const readinessResults = await Promise.all(
         ids.map((id) =>
           getStartGameReadinessApi(id)
-            .then((ready) => readinessById.set(id, unwrapReadiness(ready)))
-            .catch(() => readinessById.set(id, null)),
+            .then((ready) => ({ id, data: unwrapReadiness(ready) }))
+            .catch(() => ({ id, data: null })),
         ),
       );
+
+      const readinessById = new Map();
+      readinessResults.forEach((r) => {
+        if (r?.id) readinessById.set(r.id, r.data);
+      });
 
       const completedRows = rows.filter((h) => {
         const hid = String(h.tournamentId || h.tournament?.id || h.tournament?._id || '');

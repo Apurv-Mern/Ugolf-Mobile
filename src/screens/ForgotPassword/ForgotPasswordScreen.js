@@ -340,6 +340,7 @@ const ForgotPasswordScreen = ({ navigation }) => {
       });
     } finally {
       setLoading(false);
+      navLockRef.current = false;
     }
   };
 

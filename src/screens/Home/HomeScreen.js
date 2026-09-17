@@ -2479,7 +2479,6 @@ const HomeScreen = ({ navigation }) => {
         (a, b) => a.startDateMs - b.startDateMs,
       );
 
-      const readinessById = new Map();
       const idsToCheck = new Set();
       merged.forEach((item) => {
         if (item.id && String(item.id).includes('-')) idsToCheck.add(String(item.id));
@@ -2489,20 +2488,33 @@ const HomeScreen = ({ navigation }) => {
         if (hid && String(hid).includes('-')) idsToCheck.add(String(hid));
       });
 
-      const teamsById = new Map();
-
-      await Promise.all([
-        ...Array.from(idsToCheck).map((id) =>
-          getStartGameReadinessApi(id)
-            .then((res) => readinessById.set(id, unwrapReadiness(res)))
-            .catch(() => readinessById.set(id, null)),
+      const idsArray = Array.from(idsToCheck);
+      const [readinessResults, teamsResults] = await Promise.all([
+        Promise.all(
+          idsArray.map((id) =>
+            getStartGameReadinessApi(id)
+              .then((res) => ({ id, data: unwrapReadiness(res) }))
+              .catch(() => ({ id, data: null })),
+          ),
         ),
-        ...Array.from(idsToCheck).map((id) =>
-          getTournamentTeamsApi(id)
-            .then((res) => teamsById.set(id, res))
-            .catch(() => teamsById.set(id, null)),
+        Promise.all(
+          idsArray.map((id) =>
+            getTournamentTeamsApi(id)
+              .then((res) => ({ id, data: res }))
+              .catch(() => ({ id, data: null })),
+          ),
         ),
       ]);
+
+      const readinessById = new Map();
+      readinessResults.forEach((r) => {
+        if (r?.id) readinessById.set(r.id, r.data);
+      });
+
+      const teamsById = new Map();
+      teamsResults.forEach((t) => {
+        if (t?.id) teamsById.set(t.id, t.data);
+      });
 
       const formattedHomeTournaments = merged.map((item) => {
         const readinessObj = readinessById.get(String(item.id));

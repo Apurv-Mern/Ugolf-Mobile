@@ -450,7 +450,7 @@
 
 
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   View,
   Text,
@@ -463,6 +463,7 @@ import {
   StatusBar,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useFocusEffect } from '@react-navigation/native';
 import AuthIcon from '../../components/common/AuthIcon';
 
 import AuthInput from '../../components/common/AuthInput';
@@ -491,6 +492,12 @@ const LoginScreen = ({ navigation }) => {
   const [errors, setErrors] = useState({});
   const navLockRef = useRef(false);
   const timerRef = useRef(null);
+
+  useFocusEffect(
+    useCallback(() => {
+      navLockRef.current = false;
+    }, [])
+  );
 
   useEffect(() => {
     return () => {
@@ -619,6 +626,11 @@ const LoginScreen = ({ navigation }) => {
       }
 
       if (isEmailVerified === false) {
+        Toast.show({
+          type: 'info',
+          text1: 'Verification Required',
+          text2: 'Please verify your email before logging in.',
+        });
         navigation.navigate('EmailVerification', { email: email.trim(), sendOTP: true });
         return;
       }
@@ -665,6 +677,11 @@ const LoginScreen = ({ navigation }) => {
         errorMsg.toLowerCase().includes('verify') ||
         errorMsg.toLowerCase().includes('verification')
       ) {
+        Toast.show({
+          type: 'info',
+          text1: 'Verification Required',
+          text2: errorMsg || 'Please verify your email before logging in.',
+        });
         navigation.navigate('EmailVerification', { email: email.trim(), sendOTP: true });
       } else {
         Toast.show({
@@ -675,6 +692,7 @@ const LoginScreen = ({ navigation }) => {
       }
     } finally {
       setLoading(false);
+      navLockRef.current = false;
     }
   };
 
