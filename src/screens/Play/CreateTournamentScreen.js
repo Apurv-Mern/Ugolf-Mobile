@@ -530,7 +530,7 @@ const CreateTournamentScreen = ({ navigation, route }) => {
   // Fetch clubs based on country and state: /api/v1/mobile/courses/clubs?country={country}&state={state}
   const loadClubs = async (countryFilter, stateFilter) => {
     try {
-      const params = { limit: 100 };
+      const params = {};
       if (countryFilter && countryFilter !== 'Select Country') {
         params.country = countryFilter;
       }
