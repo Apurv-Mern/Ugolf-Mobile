@@ -2909,27 +2909,34 @@ const HomeScreen = ({ navigation }) => {
 
                 {/* Top-right mode/invited badges & Share Button */}
                 <View style={activeStyles.tournamentBadges}>
-                  {(item.source === 'mine' ||
-                    (currentUserId &&
-                      String(
-                        item.tournament?.creatorUserId ||
-                        item.tournament?.creatorId ||
-                        item.tournament?.createdBy,
-                      ) === String(currentUserId))) &&
-                    (item.shareLinkEnabled === true ||
-                      (item.shareLinkEnabled !== false &&
-                        (!!item.joinUrl || !!item.joinToken))) ? (
-                    <TouchableOpacity
-                      style={activeStyles.cardShareBtn}
-                      onPress={(e) => {
-                        e.stopPropagation();
-                        shareTournamentLink(item.tournament || item);
-                      }}
-                      activeOpacity={0.7}
-                    >
-                      <AuthIcon name="share" size={moderateScale(13)} color="#093A24" />
-                    </TouchableOpacity>
-                  ) : null}
+                  {(() => {
+                    const isPracticeMode = String(item.playMode || item.tournament?.playMode || '').toUpperCase().includes('PRACTICE');
+                    const canShareHome =
+                      (item.source === 'mine' ||
+                        (currentUserId &&
+                          String(
+                            item.tournament?.creatorUserId ||
+                            item.tournament?.creatorId ||
+                            item.tournament?.createdBy,
+                          ) === String(currentUserId))) &&
+                      !isPracticeMode &&
+                      (item.shareLinkEnabled === true ||
+                        (item.shareLinkEnabled !== false &&
+                          (!!item.joinUrl || !!item.joinToken)));
+
+                    return canShareHome ? (
+                      <TouchableOpacity
+                        style={activeStyles.cardShareBtn}
+                        onPress={(e) => {
+                          e.stopPropagation();
+                          shareTournamentLink(item.tournament || item);
+                        }}
+                        activeOpacity={0.7}
+                      >
+                        <AuthIcon name="share" size={moderateScale(13)} color="#093A24" />
+                      </TouchableOpacity>
+                    ) : null;
+                  })()}
                   {!item.gameStarted &&
                     !item.challengeLocked &&
                     !item.tournament?.challengeLocked &&
