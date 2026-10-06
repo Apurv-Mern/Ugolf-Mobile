@@ -22,7 +22,7 @@ export const extractTournamentIdFromUrl = (urlOrData) => {
 
   if (typeof urlOrData === 'string') {
     const match =
-      urlOrData.match(/\/tournaments\/([a-zA-Z0-9-]+)/) ||
+      urlOrData.match(/\/tournaments?\/([a-zA-Z0-9-]+)/) ||
       urlOrData.match(/[?&]tournamentId=([a-zA-Z0-9-]+)/) ||
       urlOrData.match(/[?&]token=([a-zA-Z0-9-]+)/) ||
       urlOrData.match(/\/join\/([a-zA-Z0-9-]+)/) ||
