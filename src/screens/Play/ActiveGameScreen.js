@@ -1549,6 +1549,7 @@ import Toast from "react-native-toast-message";
 
 import AuthIcon from "../../components/common/AuthIcon";
 import HoleMap from "../../components/play/HoleMap";
+import ShotDistanceBar from "../../components/play/ShotDistanceBar";
 import { COLORS } from "../../theme/colors";
 import { FONTS } from "../../theme/fonts";
 import { wp, hp, fontSize, moderateScale } from "../../utils/responsive";
@@ -1573,6 +1574,7 @@ const emptyMap = {
   hasGps: false,
   green: null,
   tee: null,
+  toGreenMeters: null,
   currentHolePois: [],
 };
 
@@ -1600,6 +1602,8 @@ const ActiveGameScreen = ({ navigation, route }) => {
   const [parValue, setParValue] = useState(4);
   const [shotNumber, setShotNumber] = useState(1);
   const [score, setScore] = useState(0);
+  const [scoreOnThisHole, setScoreOnThisHole] = useState(0);
+  const [shotDistanceMeters, setShotDistanceMeters] = useState(null);
   const [originLocation, setOriginLocation] = useState("TEE");
   const [locationLabel, setLocationLabel] = useState("Tee");
   const [promptText, setPromptText] = useState("After playing your shot…");
@@ -1696,6 +1700,13 @@ const ActiveGameScreen = ({ navigation, route }) => {
         const sc = playData.score ?? playData.totalScore;
         if (sc != null) setScore(sc);
 
+        if (playData.scoreOnThisHole != null) {
+          setScoreOnThisHole(Number(playData.scoreOnThisHole) || 0);
+        }
+        if (Object.prototype.hasOwnProperty.call(playData, "shotDistanceMeters")) {
+          setShotDistanceMeters(playData.shotDistanceMeters);
+        }
+
         if (playData.currentOrigin) setOriginLocation(playData.currentOrigin);
         if (playData.locationLabel != null) {
           setLocationLabel(playData.locationLabel);
@@ -1729,6 +1740,10 @@ const ActiveGameScreen = ({ navigation, route }) => {
             hasGps: !!playData.map.hasGps,
             green: playData.map.green ?? null,
             tee: playData.map.tee ?? null,
+            toGreenMeters:
+              playData.map.toGreenMeters != null
+                ? Number(playData.map.toGreenMeters)
+                : null,
             currentHolePois: Array.isArray(playData.map.currentHolePois)
               ? playData.map.currentHolePois
               : [],
@@ -2185,9 +2200,29 @@ const ActiveGameScreen = ({ navigation, route }) => {
             ))}
           </View>
 
-          <Text style={styles.scoreNumber}>{score}</Text>
-          <Text style={styles.scoreLabel}>Your Score</Text>
+          <View style={styles.scoreRow}>
+            <View style={styles.scoreCol}>
+              <Text style={styles.scoreNumber}>{scoreOnThisHole}</Text>
+              <Text style={styles.scoreLabel}>Score on this hole</Text>
+            </View>
+            <View style={styles.scoreCol}>
+              <Text style={styles.scoreNumber}>{score}</Text>
+              <Text style={styles.scoreLabel}>Total score</Text>
+            </View>
+          </View>
         </View>
+
+        {playScreen !== "FINISHED" && canCallSessionApi ? (
+          <ShotDistanceBar
+            tournamentId={tournamentId}
+            sessionId={activeSessionId}
+            holeNumber={holeNumber}
+            shotNumber={shotNumber}
+            shotDistanceMeters={shotDistanceMeters}
+            disabled={actionLoading}
+            onPlayUpdated={(play) => parseSessionState({ play })}
+          />
+        ) : null}
 
         {/* Map Section - Distance Only (Map hidden) */}
         <View style={styles.mapSection}>
@@ -2568,16 +2603,26 @@ const styles = StyleSheet.create({
     fontSize: fontSize(13),
     color: "#093A24",
   },
+  scoreRow: {
+    flexDirection: "row",
+    justifyContent: "space-around",
+    marginTop: hp(0.5),
+  },
+  scoreCol: {
+    alignItems: "center",
+    flex: 1,
+  },
   scoreNumber: {
     fontFamily: FONTS.bold,
-    fontSize: fontSize(34),
+    fontSize: fontSize(28),
     color: COLORS.white,
-    lineHeight: fontSize(38),
+    lineHeight: fontSize(32),
   },
   scoreLabel: {
     fontFamily: FONTS.medium,
-    fontSize: fontSize(12),
+    fontSize: fontSize(11),
     color: "rgba(255, 255, 255, 0.75)",
+    textAlign: "center",
   },
 
   // ── Map Section ──

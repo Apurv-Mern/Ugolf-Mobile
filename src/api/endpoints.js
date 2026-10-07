@@ -1,8 +1,10 @@
+import { resolveDevBaseUrl } from './devConfig';
+
+// Production / staging:
 // const BASE_URL = 'https://ugolf-backend.24livehost.com:5011';
-const BASE_URL = 'https://ugolf-backend.24livehost.com';
-// const BASE_URL = 'http://localhost:4000'; // works on iOS simulator only
-// const BASE_URL = 'http://192.168.10.186:4000'; // physical device on same Wi‑Fi
-// const BASE_URL = "http://10.0.2.2:4000"; // Android emulator → host machine localhost:4000
+
+/** Local dev — see devConfig.js (LAN IP for phone, 10.0.2.2 for emulator). */
+const BASE_URL = resolveDevBaseUrl();
 
 export const ENDPOINTS = {
   LOGIN: "/api/v1/mobile/auth/login",
@@ -84,6 +86,8 @@ export const ENDPOINTS = {
     `/api/v1/mobile/tournaments/${tournamentId}/game-sessions/${sessionId}/confirm-instruction`,
   GAME_SESSION_BACK: (tournamentId, sessionId) =>
     `/api/v1/mobile/tournaments/${tournamentId}/game-sessions/${sessionId}/back`,
+  GAME_SESSION_SHOT_DISTANCE: (tournamentId, sessionId) =>
+    `/api/v1/mobile/tournaments/${tournamentId}/game-sessions/${sessionId}/shot-distance`,
 };
 
 export default BASE_URL;
