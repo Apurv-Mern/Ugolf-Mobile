@@ -1047,6 +1047,7 @@ const SignUpScreen = ({ navigation }) => {
       }
     } finally {
       setLoading(false);
+      navLockRef.current = false;
     }
   };
 

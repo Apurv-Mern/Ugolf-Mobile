@@ -587,7 +587,28 @@ const HoleMap = ({
     );
   }, [points]);
 
+  const handleLocationUpdate = useCallback((location) => {
+    const latitude =
+      location?.coords?.latitude ??
+      location?.geometry?.coordinates?.[1] ??
+      location?.latitude;
+    const longitude =
+      location?.coords?.longitude ??
+      location?.geometry?.coordinates?.[0] ??
+      location?.longitude;
+    if (
+      !Number.isFinite(Number(latitude)) ||
+      !Number.isFinite(Number(longitude))
+    ) {
+      return;
+    }
+    setPlayer({ lat: Number(latitude), lng: Number(longitude) });
+    setGeoError(null);
+  }, []);
+
   useEffect(() => {
+    if (distanceOnly) return undefined;
+
     let listener = null;
     let isSubscribed = true;
 
@@ -650,9 +671,11 @@ const HoleMap = ({
       appStateSub.remove();
       stopLocationManager();
     };
-  }, [frameHole, handleLocationUpdate]);
+  }, [distanceOnly, frameHole, handleLocationUpdate]);
 
   useEffect(() => {
+    if (distanceOnly) return undefined;
+
     const timer1 = setTimeout(() => {
       frameHole();
     }, 100);
@@ -663,7 +686,7 @@ const HoleMap = ({
       clearTimeout(timer1);
       clearTimeout(timer2);
     };
-  }, [frameHole, holeNumber, mapReady, locationGranted]);
+  }, [distanceOnly, frameHole, holeNumber, mapReady, locationGranted]);
 
   const handleMapLayout = useCallback(() => {
     if (cameraRef.current && points.length > 0) {
@@ -672,25 +695,6 @@ const HoleMap = ({
       }, 100);
     }
   }, [frameHole, points]);
-
-  const handleLocationUpdate = useCallback((location) => {
-    const latitude =
-      location?.coords?.latitude ??
-      location?.geometry?.coordinates?.[1] ??
-      location?.latitude;
-    const longitude =
-      location?.coords?.longitude ??
-      location?.geometry?.coordinates?.[0] ??
-      location?.longitude;
-    if (
-      !Number.isFinite(Number(latitude)) ||
-      !Number.isFinite(Number(longitude))
-    ) {
-      return;
-    }
-    setPlayer({ lat: Number(latitude), lng: Number(longitude) });
-    setGeoError(null);
-  }, []);
 
   const distanceToGreen =
     player && validPoint(mapData?.green)

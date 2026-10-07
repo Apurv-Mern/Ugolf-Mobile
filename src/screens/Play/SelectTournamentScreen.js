@@ -980,11 +980,13 @@ const SelectTournamentScreen = ({ navigation, route }) => {
                   !item.isStarted &&
                   !item.gameStarted &&
                   !item.challengeLocked;
+                const isPracticeMode = String(item.playMode || item.tournament?.playMode || '').toUpperCase().includes('PRACTICE');
                 const canShare =
                   item.isMine &&
                   !isCompleted &&
                   !isInProgress &&
                   !item.isStarted &&
+                  !isPracticeMode &&
                   (item.shareLinkEnabled === true ||
                     (item.shareLinkEnabled !== false &&
                       (!!item.joinUrl || !!item.joinToken)));
