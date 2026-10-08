@@ -27,6 +27,17 @@ export const ENDPOINTS = {
   TOURNAMENT_LEADERBOARD: (id) =>
     `/api/v1/mobile/tournaments/${id}/leaderboard`,
   CONFIGURE_GAMES: (id) => `/api/v1/mobile/tournaments/${id}/configure-games`,
+  SHOTGUN: (id) => `/api/v1/mobile/tournaments/${id}/shotgun`,
+  SHOTGUN_ASSIGN: (id, gameNumber) =>
+    `/api/v1/mobile/tournaments/${id}/shotgun/${gameNumber}/assign`,
+  SHOTGUN_CLAIM: (id, gameNumber) =>
+    `/api/v1/mobile/tournaments/${id}/shotgun/${gameNumber}/claim`,
+  SHOTGUN_START: (id, gameNumber) =>
+    `/api/v1/mobile/tournaments/${id}/shotgun/${gameNumber}/start`,
+  SHOTGUN_START_ALL: (id) =>
+    `/api/v1/mobile/tournaments/${id}/shotgun/start-all`,
+  SHOTGUN_PICK_UP: (tournamentId, sessionId) =>
+    `/api/v1/mobile/tournaments/${tournamentId}/game-sessions/${sessionId}/pick-up`,
   GET_CLUBS: "/api/v1/mobile/courses/clubs",
   GET_COURSES: "/api/v1/mobile/courses",
   GET_COUNTRIES: "/api/v1/mobile/courses/countries",

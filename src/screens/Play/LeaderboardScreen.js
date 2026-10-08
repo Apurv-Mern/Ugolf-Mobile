@@ -437,6 +437,22 @@ import { COLORS } from '../../theme/colors';
 import { FONTS } from '../../theme/fonts';
 import { wp, hp, fontSize, moderateScale } from '../../utils/responsive';
 import { getTournamentLeaderboardApi } from '../../services/playerService';
+import { getTournamentTeamsApi } from '../../services/teamService';
+
+function viewerTeamIdFromTournamentTeams(teams, userId) {
+  if (!userId) return null;
+  const uid = String(userId).toLowerCase();
+  const list = Array.isArray(teams) ? teams : [];
+  for (const team of list) {
+    const members = team?.players || team?.members || team?.roster || [];
+    const onRoster = members.some((m) => {
+      const id = m?.userId || m?.id || m?.playerUserId;
+      return id && String(id).toLowerCase() === uid;
+    });
+    if (onRoster) return team.teamId || team.id || null;
+  }
+  return null;
+}
 
 const trophyImg = require('../../assets/Images/ trophy.png');
 const isUuid = (id) => typeof id === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
@@ -456,6 +472,10 @@ const LeaderboardScreen = ({ navigation, route }) => {
   );
   const [entries, setEntries] = useState([]);
   const [challengeTeams, setChallengeTeams] = useState([]);
+  const [isShotgunFormat, setIsShotgunFormat] = useState(false);
+  const [viewerTeamId, setViewerTeamId] = useState(
+    () => route?.params?.selectedTeam?.id || route?.params?.selectedTeam?._id || null,
+  );
   const [meta, setMeta] = useState({
     tournamentName: tournament?.name || tournament?.title || 'Tournament',
     playMode,
@@ -491,11 +511,29 @@ const LeaderboardScreen = ({ navigation, route }) => {
     }
     try {
       setLoading(true);
-      const res = await getTournamentLeaderboardApi(tournamentId, {
-        gameNumber: selectedGame,
-        view: 'game',
-      });
+      const [res, teamsRes] = await Promise.all([
+        getTournamentLeaderboardApi(tournamentId, {
+          gameNumber: selectedGame,
+          view: 'game',
+        }),
+        getTournamentTeamsApi(tournamentId).catch(() => null),
+      ]);
       const data = res?.data || res;
+      const teamList =
+        teamsRes?.teams ||
+        teamsRes?.data?.teams ||
+        teamsRes?.data ||
+        (Array.isArray(teamsRes) ? teamsRes : []);
+      const fromRoster = viewerTeamIdFromTournamentTeams(teamList, currentUserId);
+      const fromApi =
+        teamsRes?.ownSelectedTeamId ?? teamsRes?.data?.ownSelectedTeamId ?? null;
+      const fromRoute =
+        route?.params?.selectedTeam?.id || route?.params?.selectedTeam?._id || null;
+      setViewerTeamId(fromRoster || fromApi || fromRoute || null);
+      const shotgun =
+        String(data?.tournamentFormat || tournament?.tournamentFormat || '')
+          .toUpperCase() === 'SHOTGUN';
+      setIsShotgunFormat(shotgun);
       const gamesCount = Number(data?.numberOfGames) || Number(tournament?.numberOfGames) || 1;
       setNumberOfGames(Math.max(1, gamesCount));
       setMeta({
@@ -534,7 +572,26 @@ const LeaderboardScreen = ({ navigation, route }) => {
     } finally {
       setLoading(false);
     }
-  }, [tournamentId, playMode, tournament, selectedGame, currentUserId]);
+  }, [tournamentId, playMode, tournament, selectedGame, currentUserId, route?.params?.selectedTeam]);
+
+  const isViewerTeam = useCallback(
+    (team) => {
+      if (!team) return false;
+      const tid = team.teamId || team.id;
+      if (viewerTeamId && tid && String(viewerTeamId) === String(tid)) {
+        return true;
+      }
+      return (team.players || []).some((player) => {
+        const playerId = player.playerUserId || player.userId || player.id;
+        return (
+          currentUserId &&
+          playerId &&
+          String(playerId) === String(currentUserId)
+        );
+      });
+    },
+    [viewerTeamId, currentUserId],
+  );
 
   useFocusEffect(
     useCallback(() => {
@@ -545,7 +602,12 @@ const LeaderboardScreen = ({ navigation, route }) => {
   );
 
   const isChallenge = String(meta.playMode || playMode).toLowerCase().includes('challenge');
-  const modeLabel = isChallenge ? 'Challenge' : 'Practice';
+  const showTeamBoard = isChallenge || isShotgunFormat;
+  const modeLabel = isShotgunFormat
+    ? 'Shotgun'
+    : isChallenge
+      ? 'Challenge'
+      : 'Practice';
 
   return (
     <SafeAreaView style={styles.container} edges={['bottom']}>
@@ -577,13 +639,15 @@ const LeaderboardScreen = ({ navigation, route }) => {
               adjustsFontSizeToFit
               minimumFontScale={0.75}
             >
-              Game {selectedGame} · {modeLabel} · {meta.tournamentName}
+              {isShotgunFormat
+                ? `${modeLabel} · Team scores · ${meta.tournamentName}`
+                : `Game ${selectedGame} · ${modeLabel} · ${meta.tournamentName}`}
             </Text>
           </View>
         </ImageBackground>
 
         <View style={styles.contentContainer}>
-          {numberOfGames > 1 ? (
+          {numberOfGames > 1 && !isShotgunFormat ? (
             <ScrollView
               horizontal
               showsHorizontalScrollIndicator={false}
@@ -611,7 +675,7 @@ const LeaderboardScreen = ({ navigation, route }) => {
             <ActivityIndicator color="#093A24" style={{ marginTop: hp(4) }} />
           ) : (
             <>
-              {isChallenge ? (
+              {showTeamBoard ? (
                 <>
                   <View style={styles.tableHeaderRow}>
                     <Text style={[styles.colHeader, { flex: 2 }]}>Team / Player</Text>
@@ -620,27 +684,57 @@ const LeaderboardScreen = ({ navigation, route }) => {
                   {challengeTeams.length === 0 ? (
                     <Text style={styles.emptyText}>No leaderboard entries yet.</Text>
                   ) : (
-                    challengeTeams.map((team) => (
-                      <View key={team.teamId || team.teamName} style={styles.teamBoardCard}>
+                    challengeTeams.map((team) => {
+                      const yourTeam = isViewerTeam(team);
+                      return (
+                      <View
+                        key={team.teamId || team.teamName}
+                        style={[styles.teamBoardCard, yourTeam && styles.teamBoardCardYou]}
+                      >
                         <View style={styles.teamBoardHeader}>
                           <View style={styles.teamInfoCol}>
-                            <Text style={styles.teamBoardRank}>#{team.rank}</Text>
-                            <Text style={styles.teamBoardName} numberOfLines={1}>
-                              {team.teamName || 'Team'}
+                            <Text style={styles.teamBoardRank}>
+                              {team.rank > 0 ? `#${team.rank}` : '—'}
                             </Text>
+                            <View style={{ flex: 1 }}>
+                              <Text
+                                style={[styles.teamBoardName, yourTeam && styles.teamBoardNameYou]}
+                                numberOfLines={1}
+                              >
+                                {team.teamName || 'Team'}
+                                {yourTeam ? ' (You)' : ''}
+                              </Text>
+                              {team.teamCompleted ? (
+                                <Text style={styles.teamCompleteTag}>Complete</Text>
+                              ) : null}
+                            </View>
                           </View>
-                          <Text style={styles.teamBoardTotal}>{team.totalScore ?? 0}</Text>
+                          <View style={{ alignItems: 'flex-end' }}>
+                            <Text style={styles.teamTotalLabel}>Team score</Text>
+                            <Text style={styles.teamBoardTotal}>{team.totalScore ?? 0}</Text>
+                          </View>
                         </View>
                         {(team.players || []).map((player, idx) => {
                           const playerId = player.playerUserId || player.userId || player.id;
+                          const isYou =
+                            currentUserId &&
+                            playerId &&
+                            String(playerId) === String(currentUserId);
                           return (
                             <View
                               key={`${playerId || player.playerName || idx}`}
-                              style={styles.teamPlayerRow}
+                              style={[
+                                styles.teamPlayerRow,
+                                isYou && styles.teamPlayerRowYou,
+                              ]}
                             >
                               <View style={styles.playerInfoColChallenge}>
-                                <Text style={styles.teamPlayerName} numberOfLines={1}>
+                                <Text
+                                  style={[styles.teamPlayerName, isYou && styles.teamPlayerNameYou]}
+                                  numberOfLines={1}
+                                >
                                   {player.playerName || player.name || 'Player'}
+                                  {isYou ? ' · You' : ''}
                                 </Text>
                               </View>
                               <Text style={styles.teamPlayerScore}>{player.score ?? 0}</Text>
@@ -648,7 +742,8 @@ const LeaderboardScreen = ({ navigation, route }) => {
                           );
                         })}
                       </View>
-                    ))
+                    );
+                    })
                   )}
                 </>
               ) : (
@@ -864,6 +959,14 @@ const styles = StyleSheet.create({
     paddingVertical: hp(1.4),
     marginBottom: hp(1.5),
   },
+  teamBoardCardYou: {
+    borderColor: '#BCFF00',
+    borderWidth: 2,
+    backgroundColor: '#F7FFE6',
+  },
+  teamBoardNameYou: {
+    color: '#093A24',
+  },
   teamBoardHeader: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -886,12 +989,22 @@ const styles = StyleSheet.create({
     fontSize: fontSize(15),
     color: '#093A24',
   },
+  teamCompleteTag: {
+    fontFamily: FONTS.semiBold,
+    fontSize: fontSize(11),
+    color: '#2F855A',
+    marginTop: hp(0.2),
+  },
+  teamTotalLabel: {
+    fontFamily: FONTS.medium,
+    fontSize: fontSize(10),
+    color: '#718096',
+  },
   teamBoardTotal: {
-    flex: 1,
     fontFamily: FONTS.bold,
     fontSize: fontSize(16),
     color: '#093A24',
-    textAlign: 'center',
+    textAlign: 'right',
   },
   teamPlayerRow: {
     flexDirection: 'row',
@@ -899,6 +1012,15 @@ const styles = StyleSheet.create({
     paddingVertical: hp(0.7),
     borderTopWidth: 1,
     borderTopColor: '#EDF2F7',
+  },
+  teamPlayerRowYou: {
+    backgroundColor: 'rgba(188, 255, 0, 0.12)',
+    marginHorizontal: -wp(2),
+    paddingHorizontal: wp(2),
+    borderRadius: moderateScale(10),
+  },
+  teamPlayerNameYou: {
+    fontFamily: FONTS.bold,
   },
   playerInfoColChallenge: {
     flex: 2,

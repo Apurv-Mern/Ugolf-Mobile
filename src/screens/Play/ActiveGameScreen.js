@@ -102,8 +102,16 @@ const ActiveGameScreen = ({ navigation, route }) => {
   const [showGameEndModal, setShowGameEndModal] = useState(false);
   const gameEndModalDismissedRef = useRef(false);
   const [nextGameNumber, setNextGameNumber] = useState(null);
+  const [isShotgunTournament, setIsShotgunTournament] = useState(
+    () =>
+      String(tournament?.tournamentFormat || "").toUpperCase() === "SHOTGUN",
+  );
   const [actionLoading, setActionLoading] = useState(false);
   const [canGoBack, setCanGoBack] = useState(false);
+  const [teamHolePhase, setTeamHolePhase] = useState("ACTIVE");
+  const [teammateHoledOutSummary, setTeammateHoledOutSummary] =
+    useState(null);
+  const [isShotgunFormat, setIsShotgunFormat] = useState(false);
 
   const dismissGameEndModal = useCallback(() => {
     gameEndModalDismissedRef.current = true;
@@ -200,9 +208,23 @@ const ActiveGameScreen = ({ navigation, route }) => {
           );
         }
         if (playData.prompt) setPromptText(playData.prompt);
-        if (playData.instructionText != null) {
-          setInstructionText(playData.instructionText);
+        if (screen === "INSTRUCTION") {
+          setInstructionText(playData.instructionText ?? "");
+        } else {
+          setInstructionText("");
         }
+        const fmt = String(
+          playData.tournamentFormat || tournament?.tournamentFormat || "",
+        ).toUpperCase();
+        setIsShotgunFormat(fmt === "SHOTGUN");
+        setTeamHolePhase(
+          playData.teamHolePhase === "TEAMMATE_HOLED_OUT"
+            ? "TEAMMATE_HOLED_OUT"
+            : "ACTIVE",
+        );
+        setTeammateHoledOutSummary(
+          playData.teammateHoledOutSummary || null,
+        );
         setPlayMeta((prev) => ({
           tournamentName:
             playData.tournamentName ||
@@ -440,9 +462,15 @@ const ActiveGameScreen = ({ navigation, route }) => {
   useEffect(() => {
     if (playScreen !== "FINISHED" && !showGameEndModal) return;
 
-    const currentGame = Number(playMeta.gameNumber) || 1;
-    const totalGames = Number(tournament?.numberOfGames) || 0;
-    setNextGameNumber(totalGames > currentGame ? currentGame + 1 : null);
+    const shotgunFmt =
+      String(tournament?.tournamentFormat || "").toUpperCase() === "SHOTGUN";
+    if (shotgunFmt) {
+      setNextGameNumber(null);
+    } else {
+      const currentGame = Number(playMeta.gameNumber) || 1;
+      const totalGames = Number(tournament?.numberOfGames) || 0;
+      setNextGameNumber(totalGames > currentGame ? currentGame + 1 : null);
+    }
 
     if (!tournamentId || !isUuid(String(tournamentId))) return undefined;
 
@@ -451,6 +479,15 @@ const ActiveGameScreen = ({ navigation, route }) => {
       .then((res) => {
         if (cancelled) return;
         const data = res?.data || res;
+        const fmt = String(
+          data?.tournamentFormat || tournament?.tournamentFormat || "",
+        ).toUpperCase();
+        const shotgun = fmt === "SHOTGUN";
+        setIsShotgunTournament(shotgun);
+        if (shotgun) {
+          setNextGameNumber(null);
+          return;
+        }
         const next =
           data?.nextGameNumber != null ? Number(data.nextGameNumber) : null;
         setNextGameNumber(Number.isFinite(next) ? next : null);
@@ -466,6 +503,7 @@ const ActiveGameScreen = ({ navigation, route }) => {
     playMeta.gameNumber,
     tournamentId,
     tournament?.numberOfGames,
+    tournament?.tournamentFormat,
   ]);
 
   const handleAnswerYes = (questionId) => {
@@ -536,10 +574,46 @@ const ActiveGameScreen = ({ navigation, route }) => {
     }
   };
 
-  const handleConfirmInstruction = () => {
-    runPlayAction(() =>
-      confirmInstructionSessionApi(tournamentId, activeSessionId),
-    );
+  const handleConfirmInstruction = async () => {
+    if (playScreen !== "INSTRUCTION") {
+      return;
+    }
+    let screenAfterRefresh = playScreen;
+    const waitText =
+      instructionText?.includes("Waiting for your team") ||
+      instructionText?.includes("Pick up recorded");
+    if (waitText && canCallSessionApi) {
+      try {
+        const fresh = await getGameSessionApi(tournamentId, activeSessionId);
+        parseSessionState(fresh);
+        const playData =
+          fresh?.play || fresh?.session || fresh?.gameSession || fresh;
+        screenAfterRefresh =
+          playData?.screen ||
+          (playData?.finished ? "FINISHED" : "QUESTIONS");
+      } catch (_) {
+        /* fall through to confirm if refresh failed */
+      }
+    }
+    if (screenAfterRefresh !== "INSTRUCTION") {
+      return;
+    }
+    runPlayAction(async () => {
+      const res = await confirmInstructionSessionApi(
+        tournamentId,
+        activeSessionId,
+      );
+      const playData = res?.play || res?.data?.play || res?.data || res;
+      const msg = playData?.instructionText || "";
+      if (msg.includes("Waiting for your team")) {
+        Toast.show({
+          type: "info",
+          text1: "Waiting for teammates",
+          text2: "You will move to the next hole when everyone finishes.",
+        });
+      }
+      return res;
+    });
   };
 
   const handleBackStep = () => {
@@ -734,6 +808,18 @@ const ActiveGameScreen = ({ navigation, route }) => {
           </View>
         ) : null}
 
+        {isShotgunFormat &&
+        teamHolePhase === "TEAMMATE_HOLED_OUT" &&
+        teammateHoledOutSummary &&
+        playScreen === "QUESTIONS" ? (
+          <View style={styles.teammateBanner}>
+            <Text style={styles.teammateBannerText}>
+              Teammate finished: {teammateHoledOutSummary}. You may still hole
+              out on this shot; on your next shot you will pick up and move on.
+            </Text>
+          </View>
+        ) : null}
+
         {playScreen === "QUESTIONS" && questionList.length > 0 ? (
           <>
             <Text style={styles.questionSectionHeader}>
@@ -867,15 +953,19 @@ const ActiveGameScreen = ({ navigation, route }) => {
         {/* FINISHED SCREEN */}
         {playScreen === "FINISHED" ? (
           <>
-            <Text style={styles.questionSectionHeader}>ROUND COMPLETE</Text>
+            <Text style={styles.questionSectionHeader}>
+              {isShotgunTournament ? "GAME COMPLETE" : "ROUND COMPLETE"}
+            </Text>
             <View style={styles.questionCard}>
               <Text style={styles.questionText}>
-                Game {playMeta.gameNumber || 1} complete for this nine.
+                {isShotgunTournament
+                  ? "Game complete."
+                  : `Game ${playMeta.gameNumber || 1} complete for this nine.`}
               </Text>
               <Text style={styles.finalScoreText}>
                 Your Final score: {score}
               </Text>
-              {nextGameNumber != null ? (
+              {!isShotgunTournament && nextGameNumber != null ? (
                 <TouchableOpacity
                   style={[styles.nextShotBtn, { marginBottom: hp(1.2) }]}
                   onPress={handleStartNextGame}
@@ -940,12 +1030,14 @@ const ActiveGameScreen = ({ navigation, route }) => {
             </TouchableOpacity>
 
             <Text style={styles.modalTitle}>
-              Game {playMeta.gameNumber || 1} complete for this nine.
+              {isShotgunTournament
+                ? "Game complete."
+                : `Game ${playMeta.gameNumber || 1} complete for this nine.`}
             </Text>
 
             <Text style={styles.modalScoreText}>Your Final score: {score}</Text>
 
-            {nextGameNumber != null ? (
+            {!isShotgunTournament && nextGameNumber != null ? (
               <TouchableOpacity
                 style={styles.modalStartNextBtn}
                 onPress={handleStartNextGame}
@@ -1149,6 +1241,21 @@ const styles = StyleSheet.create({
     gap: wp(2),
     paddingHorizontal: wp(5),
     marginTop: hp(1.5),
+  },
+  teammateBanner: {
+    marginHorizontal: wp(5),
+    marginBottom: hp(1.5),
+    padding: moderateScale(12),
+    borderRadius: moderateScale(14),
+    backgroundColor: "rgba(188, 255, 0, 0.18)",
+    borderWidth: 1,
+    borderColor: "rgba(188, 255, 0, 0.45)",
+  },
+  teammateBannerText: {
+    fontFamily: FONTS.medium,
+    fontSize: fontSize(12.5),
+    color: "#093A24",
+    lineHeight: fontSize(18),
   },
   loadingText: {
     fontFamily: FONTS.medium,

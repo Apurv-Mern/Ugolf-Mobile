@@ -30,6 +30,8 @@ import {
   inProgressActivityMs,
   leaderboardIndicatesStarted,
   unwrapReadiness,
+  resolveTournamentFormatLabel,
+  liveRoundLabelsForTournament,
 } from '../../utils/playProgress';
 import { getPlayerGameHistoryApi, getTournamentLeaderboardApi } from '../../services/playerService';
 
@@ -141,6 +143,17 @@ const InProgressGamesScreen = ({ navigation }) => {
           history,
         );
 
+        const progressItem = {
+          tournament: t,
+          hasActiveSession: play.hasActiveSession,
+          activeSession: play.activeSession,
+          nextGameNumber: play.nextGameNumber,
+          completedGameNumbers: play.completedGameNumbers,
+          shotgunAssignmentGameNumber: play.shotgunAssignmentGameNumber,
+          gameStarted: play.gameStarted,
+          tournamentFormat: readiness?.tournamentFormat || t.tournamentFormat,
+        };
+
         if (play.hasActiveSession && play.activeSession?.id) {
           const session = play.activeSession;
           const sessionRes = await getGameSessionApi(t.id, session.id)
@@ -157,6 +170,7 @@ const InProgressGamesScreen = ({ navigation }) => {
           const courseName = sessionRes?.golfCourseName || t.clubName || t.location || t.city || t.name || t.title;
           const nineLabel =
             totalHoles === 9 ? (holeStart <= 9 ? 'Front 9' : 'Back 9') : `${totalHoles} holes`;
+          const shotgunActive = liveRoundLabelsForTournament(progressItem, sessionRes);
 
           activeGamesList.push({
             id: `${t.id}-${session.id}`,
@@ -168,14 +182,45 @@ const InProgressGamesScreen = ({ navigation }) => {
             nextGameNumber: play.nextGameNumber,
             playMode,
             hasActiveSession: true,
-            holeLabel: `Hole ${holeIndex} / ${totalHoles}`,
-            holeIndex,
-            totalHoles,
-            progress: holeIndex / totalHoles,
-            badge: 'LIVE ROUND',
-            actionLabel: `CONTINUE GAME ${Number(session.gameNumber) || play.nextGameNumber || 1}`,
+            isShotgun: Boolean(shotgunActive),
+            holeLabel: shotgunActive?.holeLabel || `Hole ${holeIndex} / ${totalHoles}`,
+            holeIndex: shotgunActive?.holeIndex ?? holeIndex,
+            totalHoles: shotgunActive?.totalHoles ?? totalHoles,
+            progress: shotgunActive?.progress ?? holeIndex / totalHoles,
+            badge: shotgunActive?.badge || 'LIVE ROUND',
+            actionLabel:
+              shotgunActive?.actionLabel ||
+              `CONTINUE GAME ${Number(session.gameNumber) || play.nextGameNumber || 1}`,
             date: t.startDate ? formatDisplayDate(t.startDate) : '',
             activityMs,
+            formatLabel: resolveTournamentFormatLabel(t, readiness),
+          });
+          continue;
+        }
+
+        const shotgunIdle = liveRoundLabelsForTournament(progressItem);
+
+        if (shotgunIdle) {
+          activeGamesList.push({
+            id: `${t.id}-shotgun`,
+            tournament: t,
+            tournamentName: t.name || t.title || 'Tournament',
+            courseTitle: t.clubName || t.location || t.city || t.name || t.title,
+            sessionId: null,
+            gameNumber: play.shotgunAssignmentGameNumber || play.nextGameNumber || 1,
+            nextGameNumber: play.nextGameNumber,
+            playMode,
+            hasActiveSession: false,
+            isShotgun: true,
+            holeLabel: shotgunIdle.holeLabel,
+            holeIndex: shotgunIdle.holeIndex,
+            totalHoles: shotgunIdle.totalHoles,
+            progress: shotgunIdle.progress,
+            badge: shotgunIdle.badge,
+            actionLabel: shotgunIdle.actionLabel,
+            date: t.startDate ? formatDisplayDate(t.startDate) : '',
+            activityMs,
+            formatLabel: resolveTournamentFormatLabel(t, readiness),
           });
           continue;
         }
@@ -193,6 +238,7 @@ const InProgressGamesScreen = ({ navigation }) => {
           nextGameNumber: play.nextGameNumber,
           playMode,
           hasActiveSession: false,
+          isShotgun: false,
           holeLabel: `Game ${play.completedCount} / ${play.numberOfGames} done`,
           holeIndex: play.completedCount,
           totalHoles: play.numberOfGames,
@@ -202,6 +248,7 @@ const InProgressGamesScreen = ({ navigation }) => {
             play.nextGameNumber != null ? `START GAME ${play.nextGameNumber}` : 'CONTINUE',
           date: t.startDate ? formatDisplayDate(t.startDate) : '',
           activityMs,
+          formatLabel: resolveTournamentFormatLabel(t, readiness),
         });
       }
 
@@ -226,6 +273,17 @@ const InProgressGamesScreen = ({ navigation }) => {
   );
 
   const handleContinueGame = (game) => {
+    if (
+      game.isShotgun &&
+      (game.actionLabel === 'VIEW LEADERBOARD' || game.badge === 'COMPLETE')
+    ) {
+      navigation.navigate('Leaderboard', {
+        tournament: game.tournament,
+        playMode: game.playMode,
+        gameNumber: game.gameNumber || 1,
+      });
+      return;
+    }
     if (game.sessionId) {
       navigation.navigate('ActiveGame', {
         tournament: game.tournament,
@@ -235,11 +293,14 @@ const InProgressGamesScreen = ({ navigation }) => {
       });
       return;
     }
+    const gameNum = game.isShotgun
+      ? game.gameNumber || game.nextGameNumber || 1
+      : game.nextGameNumber || game.gameNumber || 1;
     navigation.navigate('SelectGame', {
       tournament: game.tournament,
       playMode: game.playMode,
-      gameNumber: game.nextGameNumber || game.gameNumber || 1,
-      selectedGameIndex: Math.max(0, (game.nextGameNumber || game.gameNumber || 1) - 1),
+      gameNumber: gameNum,
+      selectedGameIndex: Math.max(0, gameNum - 1),
     });
   };
 
@@ -305,6 +366,18 @@ const InProgressGamesScreen = ({ navigation }) => {
                   <Text style={styles.liveText}>{game.badge || 'LIVE ROUND'}</Text>
                 </View>
                 <View style={styles.rightHeaderBlock}>
+                  <View
+                    style={[
+                      styles.formatBadge,
+                      game.formatLabel === 'Shotgun'
+                        ? styles.formatBadgeShotgun
+                        : styles.formatBadgeNormal,
+                    ]}
+                  >
+                    <Text style={styles.formatBadgeText}>
+                      {game.formatLabel || 'Normal'}
+                    </Text>
+                  </View>
                   <View
                     style={[
                       styles.modeBadge,
@@ -486,7 +559,29 @@ const styles = StyleSheet.create({
   rightHeaderBlock: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: wp(2),
+    flexWrap: 'wrap',
+    justifyContent: 'flex-end',
+    gap: wp(1.5),
+    maxWidth: '62%',
+  },
+  formatBadge: {
+    borderRadius: moderateScale(12),
+    paddingHorizontal: wp(2.5),
+    paddingVertical: hp(0.3),
+    borderWidth: 1,
+  },
+  formatBadgeNormal: {
+    backgroundColor: '#F1F5F9',
+    borderColor: '#CBD5E1',
+  },
+  formatBadgeShotgun: {
+    backgroundColor: 'rgba(188, 255, 0, 0.35)',
+    borderColor: '#093A24',
+  },
+  formatBadgeText: {
+    fontFamily: FONTS.bold,
+    fontSize: fontSize(10),
+    color: '#093A24',
   },
   modeBadge: {
     borderRadius: moderateScale(12),

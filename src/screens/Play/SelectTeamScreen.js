@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -25,6 +25,10 @@ import { FONTS } from '../../theme/fonts';
 import { wp, hp, fontSize, moderateScale, SCREEN_WIDTH } from '../../utils/responsive';
 import { getTeamsApi, getTeamByIdApi, getTournamentTeamsApi, selectTournamentTeamApi } from '../../services/teamService';
 import { isChallengeLocked } from '../../utils/playProgress';
+import {
+  goCreatorSetupConfigureGames,
+  isTournamentCreatorUser,
+} from '../../utils/shotgunNavigation';
 
 const teamBg = require('../../assets/Images/team_bg.jpg');
 const trophyImg = require('../../assets/Images/ trophy.png');
@@ -129,6 +133,10 @@ const SelectTeamScreen = ({ navigation, route }) => {
           });
         }
         setSelectedTeamId(newTeam.id);
+      } else if (route?.params?.preselectedTeamId) {
+        const preset = String(route.params.preselectedTeamId);
+        const match = ownTeamsOnly.find((t) => String(t.id) === preset);
+        setSelectedTeamId(match ? match.id : preset);
       } else if (ownTeamsOnly.length > 0 && !selectedTeamId) {
         setSelectedTeamId(ownTeamsOnly[0].id);
       }
@@ -149,20 +157,6 @@ const SelectTeamScreen = ({ navigation, route }) => {
     loadTeams();
   }, [route?.params?.newTeam]);
 
-  useFocusEffect(
-    React.useCallback(() => {
-      loadTeams();
-
-      const onBackPress = () => {
-        navigation.goBack();
-        return true;
-      };
-
-      const subscription = BackHandler.addEventListener('hardwareBackPress', onBackPress);
-      return () => subscription.remove();
-    }, [navigation, route?.params?.newTeam])
-  );
-
   const filteredTeams = teams.filter(
     (t) =>
       (t.name || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -179,6 +173,52 @@ const SelectTeamScreen = ({ navigation, route }) => {
     tournamentCreatorId &&
     currentUserId &&
     String(tournamentCreatorId).toLowerCase() !== String(currentUserId).toLowerCase()
+  );
+
+  const isShotgunFormat =
+    String(tournamentParam?.tournamentFormat || '').toUpperCase() === 'SHOTGUN';
+  const inCreatorShotgunSetup =
+    route?.params?.creatorSetupFlow === true ||
+    (isShotgunFormat &&
+      !isInvitedMember &&
+      (route?.params?.isCreator === true ||
+        isTournamentCreatorUser(tournamentParam, currentUserId)));
+
+  const goBackFromSelectTeam = useCallback(() => {
+    if (inCreatorShotgunSetup && tournamentId) {
+      goCreatorSetupConfigureGames(navigation, {
+        ...route?.params,
+        tournament: tournamentParam,
+        tournamentId,
+        playMode: route?.params?.playMode || tournamentParam?.playMode,
+      });
+      return;
+    }
+    if (navigation.canGoBack()) {
+      navigation.goBack();
+    } else {
+      navigation.navigate('MainApp');
+    }
+  }, [
+    inCreatorShotgunSetup,
+    tournamentId,
+    navigation,
+    route?.params,
+    tournamentParam,
+  ]);
+
+  useFocusEffect(
+    React.useCallback(() => {
+      loadTeams();
+
+      const onBackPress = () => {
+        goBackFromSelectTeam();
+        return true;
+      };
+
+      const subscription = BackHandler.addEventListener('hardwareBackPress', onBackPress);
+      return () => subscription.remove();
+    }, [route?.params?.newTeam, goBackFromSelectTeam]),
   );
 
   const isUuid = (id) => typeof id === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
@@ -253,6 +293,53 @@ const SelectTeamScreen = ({ navigation, route }) => {
     const rawPlayMode = route?.params?.playMode || tournamentParam?.playMode || 'practice';
     const normalizedPlayMode = String(rawPlayMode).toLowerCase().trim();
     const isPracticeMode = normalizedPlayMode === 'practice' || normalizedPlayMode === 'practice_round' || normalizedPlayMode.includes('practice');
+    const isShotgun =
+      String(tournamentParam?.tournamentFormat || '').toUpperCase() === 'SHOTGUN';
+    const returnTo = route?.params?.returnTo;
+
+    if (isShotgun) {
+      if (isInvitedMember) {
+        navigation.navigate('ShotgunLobby', {
+          ...route?.params,
+          tournament: tournamentParam,
+          tournamentId,
+          selectedTeam,
+          playMode: normalizedPlayMode || 'practice',
+        });
+        return;
+      }
+      navigation.navigate('InviteOtherTeams', {
+        ...route?.params,
+        tournament: tournamentParam,
+        tournamentId,
+        selectedTeam,
+        playMode: normalizedPlayMode || 'practice',
+        shotgunFlow: true,
+        creatorSetupFlow: true,
+      });
+      return;
+    }
+
+    if (returnTo === 'ShotgunSetup') {
+      navigation.navigate('ShotgunSetup', {
+        ...route?.params,
+        tournament: tournamentParam,
+        tournamentId,
+        selectedTeam,
+        playMode: normalizedPlayMode || 'practice',
+      });
+      return;
+    }
+
+    if (returnTo === 'ShotgunLobby') {
+      navigation.navigate('ShotgunLobby', {
+        ...route?.params,
+        tournament: tournamentParam,
+        selectedTeam,
+        playMode: normalizedPlayMode || 'practice',
+      });
+      return;
+    }
 
     if (challengeLocked) {
       navigation.navigate('SelectGame', {
@@ -296,13 +383,7 @@ const SelectTeamScreen = ({ navigation, route }) => {
           {/* Back Button */}
           <TouchableOpacity
             style={styles.backButtonCircle}
-            onPress={() => {
-              if (navigation.canGoBack()) {
-                navigation.goBack();
-              } else {
-                navigation.navigate('MainApp');
-              }
-            }}
+            onPress={goBackFromSelectTeam}
             activeOpacity={0.7}
           >
             <AuthIcon name="chevron-left" size={moderateScale(22)} color="#093A24" />

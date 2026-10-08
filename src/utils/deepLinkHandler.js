@@ -1,6 +1,8 @@
 import { Linking } from 'react-native';
 import { navigate } from '../navigation/RootNavigator';
 import { getTournamentByIdApi, getTournamentsApi } from '../services/homeService';
+import { store } from '../redux/store';
+import { isShotgunTournamentItem, openShotgunTournament } from './shotgunNavigation';
 
 /**
  * Extracts tournament ID from a URL string or notification data object.
@@ -36,8 +38,20 @@ export const extractTournamentIdFromUrl = (urlOrData) => {
   return null;
 };
 
+function getCurrentUserIdFromStore() {
+  const u = store.getState()?.auth?.user;
+  return u?.id || u?._id || u?.userId || null;
+}
+
+function navigationAdapter(navigationOverride) {
+  if (navigationOverride && typeof navigationOverride.navigate === 'function') {
+    return navigationOverride;
+  }
+  return { navigate };
+}
+
 /**
- * Processes a deep link URL or notification payload and navigates directly to ConfigureGames
+ * Processes a deep link URL or notification payload and navigates into tournament setup/play.
  */
 export const processDeepLink = async (urlOrData, navigationOverride = null) => {
   const targetIdOrToken = extractTournamentIdFromUrl(urlOrData);
@@ -103,43 +117,82 @@ export const processDeepLink = async (urlOrData, navigationOverride = null) => {
       (t) => String(t.id || t._id) === String(tournamentId),
     );
 
+    const payloadFormat =
+      typeof urlOrData === 'object' ? urlOrData.tournamentFormat || urlOrData.format : null;
+
     const navParams = {
       tournament: {
         ...(tournament || {}),
         id: tournamentId,
         name: tournamentName,
         title: tournamentName,
+        ...(payloadFormat ? { tournamentFormat: payloadFormat } : {}),
       },
       playMode,
       isCreator: isMine && !isInvited,
     };
 
-    const screen = isInvited || !isMine ? 'SelectGame' : 'ConfigureGames';
-    if (navigationOverride && typeof navigationOverride.navigate === 'function') {
-      navigationOverride.navigate(screen, navParams);
-    } else {
-      navigate(screen, navParams);
+    const nav = navigationAdapter(navigationOverride);
+    const listItem = {
+      tournament: navParams.tournament,
+      source: isInvited ? 'invited' : isMine ? 'mine' : undefined,
+      isMine: isMine && !isInvited,
+    };
+
+    if (isShotgunTournamentItem(listItem)) {
+      const afterInviteAccept =
+        typeof urlOrData === 'object' && urlOrData.afterTournamentInviteAccept === true;
+      await openShotgunTournament(nav, listItem, {
+        currentUserId: getCurrentUserIdFromStore(),
+        playMode,
+        forceTeamSelection: afterInviteAccept,
+        preselectedTeamId:
+          typeof urlOrData === 'object' ? urlOrData.teamId || null : null,
+      });
+      return true;
     }
+
+    const screen = isInvited || !isMine ? 'SelectGame' : 'ConfigureGames';
+    nav.navigate(screen, navParams);
     return true;
   } catch (err) {
     console.log('[DeepLink] Error processing deep link, using fallback navParams:', err);
     const tournamentName =
       typeof urlOrData === 'object' ? urlOrData?.tournamentName || 'Tournament' : 'Tournament';
+    const payloadFormat =
+      typeof urlOrData === 'object' ? urlOrData.tournamentFormat || urlOrData.format : null;
+
     const navParams = {
       tournament: {
         id: targetIdOrToken,
         name: tournamentName,
         title: tournamentName,
+        ...(payloadFormat ? { tournamentFormat: payloadFormat } : {}),
       },
       playMode: getPlayMode(urlOrData),
       isCreator: false,
     };
 
-    if (navigationOverride && typeof navigationOverride.navigate === 'function') {
-      navigationOverride.navigate('SelectGame', navParams);
-    } else {
-      navigate('SelectGame', navParams);
+    const nav = navigationAdapter(navigationOverride);
+    const listItem = {
+      tournament: navParams.tournament,
+      source: 'invited',
+    };
+
+    if (isShotgunTournamentItem(listItem)) {
+      const afterInviteAccept =
+        typeof urlOrData === 'object' && urlOrData.afterTournamentInviteAccept === true;
+      await openShotgunTournament(nav, listItem, {
+        currentUserId: getCurrentUserIdFromStore(),
+        playMode: navParams.playMode,
+        forceTeamSelection: afterInviteAccept,
+        preselectedTeamId:
+          typeof urlOrData === 'object' ? urlOrData.teamId || null : null,
+      });
+      return true;
     }
+
+    nav.navigate('SelectGame', navParams);
     return true;
   }
 };

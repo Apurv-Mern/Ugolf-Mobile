@@ -14,7 +14,13 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useFocusEffect } from "@react-navigation/native";
+import { useSelector } from "react-redux";
 import Toast from "react-native-toast-message";
+import {
+  goCreatorSetupHoles,
+  goCreatorSetupSelectTeam,
+  isTournamentCreatorUser,
+} from "../../utils/shotgunNavigation";
 
 import AuthButton from "../../components/common/AuthButton";
 import AuthIcon from "../../components/common/AuthIcon";
@@ -46,6 +52,8 @@ const isUuid = (id) =>
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
 
 const InviteOtherTeamsScreen = ({ navigation, route }) => {
+  const currentUser = useSelector((state) => state.auth.user);
+  const currentUserId = currentUser?.id || currentUser?._id;
   const tournamentParam = route?.params?.tournament;
   const selectedTeam = route?.params?.selectedTeam;
   const playMode = route?.params?.playMode;
@@ -60,6 +68,33 @@ const InviteOtherTeamsScreen = ({ navigation, route }) => {
   const [challengeLocked, setChallengeLocked] = useState(
     !!tournamentParam?.challengeLocked,
   );
+  const [maxTeamSlots, setMaxTeamSlots] = useState(null);
+  const [linkedTeamCount, setLinkedTeamCount] = useState(null);
+
+  const isShotgunFlow =
+    route?.params?.shotgunFlow === true ||
+    String(tournamentParam?.tournamentFormat || "").toUpperCase() === "SHOTGUN";
+  const creatorSetupFlow = route?.params?.creatorSetupFlow === true;
+
+  const inCreatorSetupFlow =
+    creatorSetupFlow ||
+    (isShotgunFlow &&
+      isTournamentCreatorUser(tournamentParam, currentUserId));
+
+  const goBackInFlow = () => {
+    if (inCreatorSetupFlow) {
+      goCreatorSetupSelectTeam(navigation, {
+        ...route?.params,
+        tournament: tournamentParam,
+        tournamentId,
+        selectedTeam,
+        playMode,
+        preselectedTeamId: selectedTeam?.id,
+      });
+      return;
+    }
+    navigation.goBack();
+  };
 
   // Load candidate opponent teams from API
   const fetchInviteCandidates = async ({ isRefresh = false } = {}) => {
@@ -116,6 +151,10 @@ const InviteOtherTeamsScreen = ({ navigation, route }) => {
         }
       });
       setMasterInvitedTeams(currentInvitedOpponents);
+      setMaxTeamSlots(tRes?.maxTeamSlots ?? tRes?.data?.maxTeamSlots ?? null);
+      setLinkedTeamCount(
+        tRes?.linkedTeamCount ?? tRes?.data?.linkedTeamCount ?? null,
+      );
 
       if (Array.isArray(candidates)) {
         const formatted = candidates.map((item, idx) => {
@@ -169,10 +208,11 @@ const InviteOtherTeamsScreen = ({ navigation, route }) => {
         setTeamsList(formatted);
       }
 
-      const locked =
-        tRes?.challengeLocked === true ||
-        tRes?.data?.challengeLocked === true ||
-        !!tournamentParam?.challengeLocked;
+      const locked = isShotgunFlow
+        ? false
+        : tRes?.challengeLocked === true ||
+          tRes?.data?.challengeLocked === true ||
+          !!tournamentParam?.challengeLocked;
       setChallengeLocked(locked);
     } catch (err) {
       console.log("Fetch invite candidates error:", err);
@@ -205,7 +245,7 @@ const InviteOtherTeamsScreen = ({ navigation, route }) => {
       fetchInviteCandidates();
 
       const onBackPress = () => {
-        navigation.goBack();
+        goBackInFlow();
         return true;
       };
 
@@ -214,7 +254,7 @@ const InviteOtherTeamsScreen = ({ navigation, route }) => {
         onBackPress,
       );
       return () => subscription.remove();
-    }, [navigation, tournamentId]),
+    }, [navigation, tournamentId, inCreatorSetupFlow]),
   );
 
   const handleToggleInvite = async (teamItem) => {
@@ -286,8 +326,28 @@ const InviteOtherTeamsScreen = ({ navigation, route }) => {
         (t.city || "").toLowerCase().includes(searchQuery.toLowerCase())),
   );
   const hasActiveOpponentInvite = invitedCount > 0;
+  const tournamentFull =
+    isShotgunFlow &&
+    maxTeamSlots != null &&
+    linkedTeamCount != null &&
+    linkedTeamCount >= maxTeamSlots;
 
   const handleContinue = () => {
+    if (isShotgunFlow) {
+      const shared = {
+        tournament: tournamentParam,
+        selectedTeam,
+        playMode,
+        tournamentId,
+      };
+      if (inCreatorSetupFlow) {
+        goCreatorSetupHoles(navigation, shared);
+      } else {
+        navigation.navigate("ShotgunLobby", shared);
+      }
+      return;
+    }
+
     if (invitedCount === 0) {
       Toast.show({
         type: "error",
@@ -298,7 +358,6 @@ const InviteOtherTeamsScreen = ({ navigation, route }) => {
       return;
     }
 
-    // Opponent acceptance is shown and gated on Select game (start readiness).
     navigation.navigate("SelectGame", {
       tournament: tournamentParam,
       selectedTeam,
@@ -318,7 +377,7 @@ const InviteOtherTeamsScreen = ({ navigation, route }) => {
       <View style={styles.headerBlock}>
         <TouchableOpacity
           style={styles.backButtonCircle}
-          onPress={() => navigation.goBack()}
+          onPress={goBackInFlow}
           activeOpacity={0.7}
         >
           <AuthIcon
@@ -432,17 +491,31 @@ const InviteOtherTeamsScreen = ({ navigation, route }) => {
               </View>
             )}
 
-            {hasActiveOpponentInvite && !challengeLocked ? (
+            {isShotgunFlow && maxTeamSlots != null ? (
+              <Text style={styles.oneInviteHint}>
+                Accepted teams: {linkedTeamCount ?? "—"} / {maxTeamSlots} (9 per
+                configured game). Pending invites do not count. Share link uses
+                the same limit.
+              </Text>
+            ) : null}
+            {!isShotgunFlow && hasActiveOpponentInvite && !challengeLocked ? (
               <Text style={styles.oneInviteHint}>
                 Only one opponent invite at a time. Uninvite first to invite
                 another team.
               </Text>
             ) : null}
+            {tournamentFull ? (
+              <Text style={styles.oneInviteHint}>
+                This tournament is full. Uninvite a team to add another.
+              </Text>
+            ) : null}
 
             {/* Teams list */}
             {filteredTeams.map((item, idx) => {
-              const inviteDisabled =
-                !item.isInvited && (hasActiveOpponentInvite || challengeLocked);
+              const inviteDisabled = isShotgunFlow
+                ? !item.isInvited && tournamentFull
+                : !item.isInvited &&
+                  (hasActiveOpponentInvite || challengeLocked);
               const actionLabel = item.isPending
                 ? "Uninvite"
                 : "Invite to tournament";
