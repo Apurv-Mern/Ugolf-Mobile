@@ -136,3 +136,6 @@ ios/fastlane/test_output/Archive.zip
 /Archive.zip
 /scratch/
 android/local.properties
+
+# Android signing credentials
+*.keystore
