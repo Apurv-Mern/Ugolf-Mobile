@@ -711,7 +711,7 @@
 
 
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
   View,
   Text,
@@ -764,9 +764,24 @@ const SignUpScreen = ({ navigation }) => {
   const [agreeTerms, setAgreeTerms] = useState(false);
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState({});
+  const navLockRef = useRef(false);
+
+  const safeLoginNavigate = () => {
+    if (!navigation.isFocused() || navLockRef.current) return;
+    navLockRef.current = true;
+    if (navigation.canGoBack()) {
+      navigation.goBack();
+    } else {
+      navigation.navigate('Login');
+    }
+    setTimeout(() => {
+      navLockRef.current = false;
+    }, 1000);
+  };
 
   useEffect(() => {
     const unsubscribeFocus = navigation.addListener('focus', () => {
+      navLockRef.current = false;
       setErrors({});
       setFirstName('');
       setLastName('');
@@ -946,10 +961,12 @@ const SignUpScreen = ({ navigation }) => {
   };
 
   const handleSignUp = async () => {
+    if (loading || navLockRef.current) return;
     if (!validateForm()) {
       return;
     }
 
+    navLockRef.current = true;
     setLoading(true);
     try {
       const response = await registerApi({
@@ -971,7 +988,7 @@ const SignUpScreen = ({ navigation }) => {
       Toast.show({
         type: 'success',
         text1: 'Registration Successful',
-        text2: response?.message || 'Welcome to UGolf!',
+        text2: response?.message || 'Welcome to Universal Golf!',
       });
 
       if (response?.accessToken) {
@@ -1006,7 +1023,7 @@ const SignUpScreen = ({ navigation }) => {
       } else {
         navigation.replace('EmailVerification', {
           email: email.trim(),
-          sendOTP: true,
+          sendOTP: false,
         });
       }
     } catch (error) {
@@ -1030,6 +1047,7 @@ const SignUpScreen = ({ navigation }) => {
       }
     } finally {
       setLoading(false);
+      navLockRef.current = false;
     }
   };
 
@@ -1200,18 +1218,18 @@ const SignUpScreen = ({ navigation }) => {
                 I agree to the{' '}
                 <Text
                   style={styles.termsHighlight}
-                  onPress={() => navigation.navigate('TermsOfService')}
+                  onPress={() => Linking.openURL('https://universalgolf-owner.com/terms-and-conditions.html').catch(() => { })}
                 >
                   Terms of Service
                 </Text>{' '}
                 and{' '}
                 <Text
                   style={styles.termsHighlight}
-                  onPress={() => navigation.navigate('PrivacyPolicy')}
+                  onPress={() => Linking.openURL('https://universalgolf-owner.com/privacy-policy.html').catch(() => { })}
                 >
                   Privacy Policy
                 </Text>{' '}
-                of UGolf.
+                of Universal Golf.
               </Text>
             </View>
             {errors.agreeTerms && (
@@ -1232,13 +1250,7 @@ const SignUpScreen = ({ navigation }) => {
             <View style={styles.loginRow}>
               <Text style={styles.alreadyText}>Already A Member?</Text>
               <TouchableOpacity
-                onPress={() => {
-                  if (navigation.canGoBack()) {
-                    navigation.goBack();
-                  } else {
-                    navigation.navigate('Login');
-                  }
-                }}
+                onPress={safeLoginNavigate}
                 activeOpacity={0.7}
               >
                 <Text style={styles.loginText}>Login</Text>
@@ -1307,7 +1319,7 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.white,
     paddingHorizontal: wp(7),
     paddingTop: hp(1),
-    paddingBottom: hp(4),
+    paddingBottom: hp(8),
     position: 'relative',
   },
   termsRow: {
@@ -1355,6 +1367,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     marginTop: hp(3.5),
+    marginBottom: hp(4),
   },
   alreadyText: {
     fontFamily: FONTS.medium,

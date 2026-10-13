@@ -605,7 +605,7 @@ const GameRulesScreen = ({ navigation, route }) => {
   const renderStaticRules = () => (
     <>
       <Text style={styles.descriptionText}>
-        Ugolf is a shot-by-shot scoring game. After each shot you answer questions about where the
+        Universal Golf is a shot-by-shot scoring game. After each shot you answer questions about where the
         ball landed. Your answers determine the next shot origin and your score for that hole.
       </Text>
 

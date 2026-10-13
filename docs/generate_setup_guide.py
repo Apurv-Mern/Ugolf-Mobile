@@ -370,7 +370,7 @@ def main():
         [
             "UGolf uses location services (GPS) to show the player's position on the course map. This must be declared in both store privacy forms.",
             "A Privacy Policy is mandatory on both platforms before the app can be published.",
-            "The Android app package name is: com.ugolf",
+            "The Android app package name is: com.universalgolf",
             "The iOS bundle identifier will be confirmed and aligned by the development team before submission.",
             "Keep your developer account credentials secure. Do not share passwords — use the built-in invitation/team access features instead.",
             "Apple Developer membership must be renewed annually (USD 99) or your app will be removed from the App Store.",

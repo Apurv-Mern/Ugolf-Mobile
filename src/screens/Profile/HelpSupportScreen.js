@@ -118,12 +118,12 @@ const HelpSupportScreen = ({ navigation }) => {
 
   const handleEmailSupport = () => {
     Linking.openURL(
-      "mailto:support@ugolf.com?subject=UGolf%20Support%20Inquiry",
+      "mailto:support@universalgolf.com?subject=Universal%20Golf%20Support%20Inquiry",
     ).catch(() => {
       Toast.show({
         type: "info",
         text1: "Support Email",
-        text2: "Reach us at support@ugolf.com",
+        text2: "Reach us at support@universalgolf.com",
       });
     });
   };
@@ -177,7 +177,7 @@ const HelpSupportScreen = ({ navigation }) => {
               <AuthIcon name="mail" size={moderateScale(20)} color="#093A24" />
             </View>
             <Text style={styles.contactCardTitle}>Email Support</Text>
-            <Text style={styles.contactCardSub}>support@ugolf.com</Text>
+            <Text style={styles.contactCardSub}>support@universalgolf.com</Text>
           </TouchableOpacity>
 
           {/* Live Chat (Commented out for future use) */}

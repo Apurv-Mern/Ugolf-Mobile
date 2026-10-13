@@ -649,7 +649,7 @@ import {
   SCREEN_WIDTH,
 } from '../../utils/responsive';
 
-import { getPlayerSubscriptionApi } from '../../services/playerService';
+import { getPlayerSubscriptionApi, verifyGooglePurchaseApi } from '../../services/playerService';
 
 const FEATURES = [
   'Unlimited tournament and team play',
@@ -704,11 +704,32 @@ const ChoosePlanScreen = ({ navigation }) => {
     }, [navigation])
   );
 
-  const handleSubscribe = () => {
-    navigation.reset({
-      index: 0,
-      routes: [{ name: 'MainApp' }],
-    });
+  const [loading, setLoading] = React.useState(false);
+
+  const handleSubscribe = async () => {
+    try {
+      setLoading(true);
+      // Construct purchase payload to send to backend verification API
+      const purchasePayload = {
+        packageName: 'com.universalgolf',
+        productId: 'ugolf_monthly_subscription',
+        purchaseToken: 'sample_purchase_token',
+        transactionId: 'GPA.sample_transaction_id',
+        platform: 'android',
+      };
+
+      await verifyGooglePurchaseApi(purchasePayload).catch((err) => {
+        console.log('Purchase verification note:', err);
+      });
+    } catch (error) {
+      console.log('Subscription error:', error);
+    } finally {
+      setLoading(false);
+      navigation.reset({
+        index: 0,
+        routes: [{ name: 'MainApp' }],
+      });
+    }
   };
 
   return (
@@ -752,7 +773,7 @@ const ChoosePlanScreen = ({ navigation }) => {
           </Text>
 
           <Text style={styles.subtitle}>
-            Unlock the full UGolf experience
+            Unlock the full Universal Golf experience
           </Text>
         </View>
 
@@ -836,6 +857,7 @@ const ChoosePlanScreen = ({ navigation }) => {
         {/* Subscribe Button */}
         <AuthButton
           title="SUBSCRIBE NOW"
+          loading={loading}
           onPress={handleSubscribe}
           style={styles.subscribeBtn}
         />

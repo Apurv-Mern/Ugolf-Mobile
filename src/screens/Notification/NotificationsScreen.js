@@ -1743,10 +1743,17 @@ const NotificationsScreen = ({ navigation }) => {
       setTodayList((prev) => markInviteResponded(prev, item.id, 'accepted'));
       setEarlierList((prev) => markInviteResponded(prev, item.id, 'accepted'));
 
-      // Deep link to tournament directly after accepting invite
       const data = raw.data || item.data || {};
       if (data.deepLink || data.tournamentId) {
-        processDeepLink(data, navigation);
+        processDeepLink(
+          {
+            ...data,
+            ...(type.includes('TOURNAMENT')
+              ? { afterTournamentInviteAccept: true }
+              : {}),
+          },
+          navigation,
+        );
       }
     } catch (err) {
       console.log(

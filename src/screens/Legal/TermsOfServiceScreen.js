@@ -31,20 +31,20 @@ const TermsOfServiceScreen = () => {
         <Text style={styles.lastUpdated}>Last Updated: July 2026</Text>
 
         <Text style={styles.paragraph}>
-          Welcome to UGolf. By accessing or using our application, you agree to comply with and be bound by the following terms and conditions. Please read them carefully.
+          Welcome to Universal Golf. By accessing or using our application, you agree to comply with and be bound by the following terms and conditions. Please read them carefully.
         </Text>
 
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>1. Acceptance of Terms</Text>
           <Text style={styles.sectionText}>
-            By creating an account, subscribing to any plans, or utilizing the UGolf application in any way, you confirm that you accept these Terms of Service and agree to abide by them.
+            By creating an account, subscribing to any plans, or utilizing the Universal Golf application in any way, you confirm that you accept these Terms of Service and agree to abide by them.
           </Text>
         </View>
 
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>2. Use of the App</Text>
           <Text style={styles.sectionText}>
-            You agree to use UGolf only for lawful purposes related to tracking your golf stats, rounds, and participating in tournament events. Any unauthorized commercial use or modification of application assets is strictly prohibited.
+            You agree to use Universal Golf only for lawful purposes related to tracking your golf stats, rounds, and participating in tournament events. Any unauthorized commercial use or modification of application assets is strictly prohibited.
           </Text>
         </View>
 
@@ -58,7 +58,7 @@ const TermsOfServiceScreen = () => {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>4. User Accounts</Text>
           <Text style={styles.sectionText}>
-            You are solely responsible for maintaining the confidentiality of your account credentials and for all activities that occur under your user account. UGolf reserves the right to terminate accounts that violate our guidelines.
+            You are solely responsible for maintaining the confidentiality of your account credentials and for all activities that occur under your user account. Universal Golf reserves the right to terminate accounts that violate our guidelines.
           </Text>
         </View>
 
@@ -72,7 +72,7 @@ const TermsOfServiceScreen = () => {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>6. Contact Us</Text>
           <Text style={styles.sectionText}>
-            If you have any questions or feedback regarding these terms, please contact our support team at support@ugolf.com.
+            If you have any questions or feedback regarding these terms, please contact our support team at support@universalgolf.com.
           </Text>
         </View>
       </ScrollView>

@@ -60,7 +60,8 @@ const SuccessScreen = ({ navigation }) => {
         backgroundColor="transparent"
         barStyle="light-content"
       />
-      <ImageBackground source={authBg} style={styles.backgroundImage} resizeMode="cover">
+      <ImageBackground source={authBg} style={styles.backgroundImage} resi
+        zeMode="cover">
         {/* Dark overlay */}
         <View style={styles.overlay} />
 

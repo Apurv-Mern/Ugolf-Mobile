@@ -452,30 +452,23 @@
 
 // export default HoleMap;
 
-
-
-
-
 import React, {
   useCallback,
   useEffect,
   useMemo,
   useRef,
   useState,
-} from 'react';
-import { Platform, StyleSheet, Text, View } from 'react-native';
-import Mapbox from '@rnmapbox/maps';
-import {
-  check,
-  request,
-  PERMISSIONS,
-  RESULTS,
-} from 'react-native-permissions';
+} from "react";
+import { Platform, StyleSheet, Text, View, AppState } from "react-native";
+import Mapbox from "@rnmapbox/maps";
+import { check, request, PERMISSIONS, RESULTS } from "react-native-permissions";
 
-import { COLORS } from '../../theme/colors';
-import { FONTS } from '../../theme/fonts';
-import { hp, wp, fontSize, moderateScale } from '../../utils/responsive';
-import { MAPBOX_STYLE_URL } from '../../config/mapbox';
+import AuthIcon from "../common/AuthIcon";
+import { COLORS } from "../../theme/colors";
+import { FONTS } from "../../theme/fonts";
+import { hp, wp, fontSize, moderateScale } from "../../utils/responsive";
+import { MAPBOX_STYLE_URL } from "../../config/mapbox";
+import { formatMeters, mapToGreenMeters } from "../../utils/geo";
 
 const EARTH_RADIUS_M = 6371000;
 const NEAR_COURSE_M = 2500;
@@ -492,26 +485,19 @@ const haversineMeters = (a, b) => {
   return 2 * EARTH_RADIUS_M * Math.asin(Math.min(1, Math.sqrt(h)));
 };
 
-const formatDistance = (meters) => {
-  // const yards = meters * 1.09361;
-  // if (yards < 30) return `${Math.round(yards)} yd`;
-  // return `${Math.round(yards)} yd (${Math.round(meters)} m)`;
-  return `${Math.round(meters)} m`;
-};
-
 const poiLabel = (poi) => {
   switch (Number(poi)) {
     case 1:
-      return 'Green';
+      return "Green";
     case 2:
-      return 'Green bunker';
+      return "Green bunker";
     case 3:
-      return 'Fairway bunker';
+      return "Fairway bunker";
     case 4:
-      return 'Water';
+      return "Water";
     case 11:
     case 12:
-      return 'Tee';
+      return "Tee";
     default:
       return `POI ${poi}`;
   }
@@ -520,17 +506,17 @@ const poiLabel = (poi) => {
 const poiColor = (poi) => {
   switch (Number(poi)) {
     case 1:
-      return '#22C55E';
+      return "#22C55E";
     case 2:
     case 3:
-      return '#EAB308';
+      return "#EAB308";
     case 4:
-      return '#3B82F6';
+      return "#3B82F6";
     case 11:
     case 12:
-      return '#F97316';
+      return "#F97316";
     default:
-      return '#94A3B8';
+      return "#94A3B8";
   }
 };
 
@@ -541,7 +527,7 @@ const validPoint = (point) =>
 
 const requestLocationPermission = async () => {
   const permission =
-    Platform.OS === 'ios'
+    Platform.OS === "ios"
       ? PERMISSIONS.IOS.LOCATION_WHEN_IN_USE
       : PERMISSIONS.ANDROID.ACCESS_FINE_LOCATION;
   const current = await check(permission);
@@ -556,7 +542,12 @@ const requestLocationPermission = async () => {
  * The play API remains the source of truth for hole POIs; device location is
  * only used for the player puck, distance and display-only proximity hints.
  */
-const HoleMap = ({ mapData, holeNumber, compact = false }) => {
+const HoleMap = ({
+  mapData,
+  holeNumber,
+  compact = false,
+  distanceOnly = false,
+}) => {
   const cameraRef = useRef(null);
   const [mapReady, setMapReady] = useState(false);
   const [locationGranted, setLocationGranted] = useState(false);
@@ -596,37 +587,95 @@ const HoleMap = ({ mapData, holeNumber, compact = false }) => {
     );
   }, [points]);
 
-  useEffect(() => {
-    requestLocationPermission()
-      .then((granted) => {
-        setLocationGranted(granted);
-        if (granted) {
-          try {
-            Mapbox.locationManager.start();
-          } catch (e) {
-            console.log('Location manager start error:', e);
-          }
-        } else {
-          setGeoError('Location permission denied');
-        }
-        // Force map re-frame when permission modal dismisses
-        setTimeout(() => {
-          frameHole();
-        }, 200);
-        setTimeout(() => {
-          frameHole();
-        }, 600);
-      })
-      .catch(() => setGeoError('Location unavailable'));
-
-    return () => {
-      try {
-        Mapbox.locationManager.stop();
-      } catch (e) { }
-    };
+  const handleLocationUpdate = useCallback((location) => {
+    const latitude =
+      location?.coords?.latitude ??
+      location?.geometry?.coordinates?.[1] ??
+      location?.latitude;
+    const longitude =
+      location?.coords?.longitude ??
+      location?.geometry?.coordinates?.[0] ??
+      location?.longitude;
+    if (
+      !Number.isFinite(Number(latitude)) ||
+      !Number.isFinite(Number(longitude))
+    ) {
+      return;
+    }
+    setPlayer({ lat: Number(latitude), lng: Number(longitude) });
+    setGeoError(null);
   }, []);
 
   useEffect(() => {
+    if (distanceOnly) return undefined;
+
+    let listener = null;
+    let isSubscribed = true;
+
+    const startLocationManager = () => {
+      try {
+        Mapbox.locationManager.start();
+        if (
+          typeof Mapbox.locationManager.addListener === "function" &&
+          !listener
+        ) {
+          listener = Mapbox.locationManager.addListener(handleLocationUpdate);
+        }
+      } catch (e) {
+        console.log("Location manager start error:", e);
+      }
+    };
+
+    const stopLocationManager = () => {
+      try {
+        if (listener && typeof listener.remove === "function") {
+          listener.remove();
+          listener = null;
+        }
+        Mapbox.locationManager.stop();
+      } catch (e) {}
+    };
+
+    requestLocationPermission()
+      .then((granted) => {
+        if (!isSubscribed) return;
+        setLocationGranted(granted);
+        if (granted) {
+          setGeoError(null);
+          startLocationManager();
+        } else {
+          setGeoError("Location permission denied");
+        }
+        setTimeout(() => {
+          if (isSubscribed) frameHole();
+        }, 200);
+        setTimeout(() => {
+          if (isSubscribed) frameHole();
+        }, 600);
+      })
+      .catch(() => {
+        if (isSubscribed) setGeoError("Location unavailable");
+      });
+
+    // Pause location updates when app goes to background; resume when active
+    const appStateSub = AppState.addEventListener("change", (nextAppState) => {
+      if (nextAppState === "active") {
+        startLocationManager();
+      } else if (nextAppState === "background" || nextAppState === "inactive") {
+        stopLocationManager();
+      }
+    });
+
+    return () => {
+      isSubscribed = false;
+      appStateSub.remove();
+      stopLocationManager();
+    };
+  }, [distanceOnly, frameHole, handleLocationUpdate]);
+
+  useEffect(() => {
+    if (distanceOnly) return undefined;
+
     const timer1 = setTimeout(() => {
       frameHole();
     }, 100);
@@ -637,7 +686,7 @@ const HoleMap = ({ mapData, holeNumber, compact = false }) => {
       clearTimeout(timer1);
       clearTimeout(timer2);
     };
-  }, [frameHole, holeNumber, mapReady, locationGranted]);
+  }, [distanceOnly, frameHole, holeNumber, mapReady, locationGranted]);
 
   const handleMapLayout = useCallback(() => {
     if (cameraRef.current && points.length > 0) {
@@ -647,33 +696,32 @@ const HoleMap = ({ mapData, holeNumber, compact = false }) => {
     }
   }, [frameHole, points]);
 
-  const handleLocationUpdate = useCallback((location) => {
-    const latitude =
-      location?.coords?.latitude ??
-      location?.geometry?.coordinates?.[1] ??
-      location?.latitude;
-    const longitude =
-      location?.coords?.longitude ??
-      location?.geometry?.coordinates?.[0] ??
-      location?.longitude;
-    if (!Number.isFinite(Number(latitude)) || !Number.isFinite(Number(longitude))) {
-      return;
-    }
-    setPlayer({ lat: Number(latitude), lng: Number(longitude) });
-    setGeoError(null);
-  }, []);
-
   const distanceToGreen =
     player && validPoint(mapData?.green)
       ? haversineMeters(player, mapData.green)
       : null;
 
-  const teeToGreenDistance =
-    validPoint(mapData?.tee) && validPoint(mapData?.green)
-      ? haversineMeters(mapData.tee, mapData.green)
-      : null;
+  const mapGreenDistanceMeters = mapToGreenMeters(mapData);
 
-  const displayDistance = distanceToGreen ?? teeToGreenDistance;
+  if (distanceOnly) {
+    const formattedVal = formatMeters(mapGreenDistanceMeters);
+    return (
+      <View style={styles.distanceCard}>
+        <View style={styles.distanceLeftGroup}>
+          <View style={styles.distanceIconCircle}>
+            <AuthIcon name="target" size={moderateScale(15)} color="#093A24" />
+          </View>
+          <View style={styles.distanceTextCol}>
+            <Text style={styles.distanceLabel}>TO GREEN</Text>
+            {/* <Text style={styles.distanceSubText}>Live GPS Distance</Text> */}
+          </View>
+        </View>
+        <Text style={styles.distanceValueText} numberOfLines={1}>
+          {formattedVal}
+        </Text>
+      </View>
+    );
+  }
 
   const holeAnchor = mapData?.green || mapData?.tee || null;
   const playerNearCourse =
@@ -697,23 +745,23 @@ const HoleMap = ({ mapData, holeNumber, compact = false }) => {
       )} m) — hint only`;
     }
     if (distanceToGreen != null && distanceToGreen < 40) {
-      return 'Near the green — hint only';
+      return "Near the green — hint only";
     }
     return null;
   }, [distanceToGreen, mapData, player]);
 
   const playerLine = useMemo(
     () => ({
-      type: 'Feature',
+      type: "Feature",
       properties: {},
       geometry: {
-        type: 'LineString',
+        type: "LineString",
         coordinates:
           playerNearCourse && player && validPoint(mapData?.green)
             ? [
-              [player.lng, player.lat],
-              [Number(mapData.green.lng), Number(mapData.green.lat)],
-            ]
+                [player.lng, player.lat],
+                [Number(mapData.green.lng), Number(mapData.green.lat)],
+              ]
             : [],
       },
     }),
@@ -746,9 +794,9 @@ const HoleMap = ({ mapData, holeNumber, compact = false }) => {
       <View style={styles.headerRow}>
         <Text style={styles.title}>HOLE {holeNumber} MAP</Text>
         <Text style={styles.distance} numberOfLines={1}>
-          {displayDistance != null
-            ? `To green: ${formatDistance(displayDistance)}`
-            : 'Distance unavailable'}
+          {mapGreenDistanceMeters != null
+            ? `To green: ${formatMeters(mapGreenDistanceMeters)}`
+            : "Unavailable"}
         </Text>
       </View>
 
@@ -764,7 +812,13 @@ const HoleMap = ({ mapData, holeNumber, compact = false }) => {
         </Text>
       ) : null}
 
-      <View style={[styles.mapClip, compact && styles.mapClipCompact]}>
+      <View
+        style={[
+          styles.mapClip,
+          compact && styles.mapClipCompact,
+          distanceOnly && styles.mapClipHidden,
+        ]}
+      >
         <Mapbox.MapView
           style={styles.map}
           styleURL={MAPBOX_STYLE_URL}
@@ -831,7 +885,7 @@ const HoleMap = ({ mapData, holeNumber, compact = false }) => {
             <Mapbox.LineLayer
               id="player-to-green-line"
               style={{
-                lineColor: '#38BDF8',
+                lineColor: "#38BDF8",
                 lineWidth: 3,
                 lineOpacity: 0.9,
               }}
@@ -848,7 +902,7 @@ const HoleMap = ({ mapData, holeNumber, compact = false }) => {
               />
               <Mapbox.LocationPuck
                 visible
-                pulsing={{ isEnabled: true, color: '#2563EB' }}
+                pulsing={{ isEnabled: true, color: "#2563EB" }}
               />
             </>
           ) : null}
@@ -863,32 +917,89 @@ const styles = StyleSheet.create({
     gap: hp(1),
   },
   headerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
     gap: wp(3),
   },
   title: {
     fontFamily: FONTS.bold,
     fontSize: fontSize(15),
-    color: '#093A24',
+    color: "#093A24",
   },
   distance: {
     flexShrink: 1,
     fontFamily: FONTS.medium,
     fontSize: fontSize(11),
-    color: '#718096',
-    textAlign: 'right',
+    color: "#718096",
+    textAlign: "right",
+  },
+  distanceCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    backgroundColor: "#093A24",
+    borderRadius: moderateScale(16),
+    paddingHorizontal: wp(4),
+    paddingVertical: hp(1.2),
+    marginTop: hp(1.5),
+    borderWidth: 1.5,
+    borderColor: "#BCFF00",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 6,
+    elevation: 3,
+  },
+  distanceLeftGroup: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: wp(2.5),
+  },
+  distanceIconCircle: {
+    width: moderateScale(32),
+    height: moderateScale(32),
+    borderRadius: moderateScale(16),
+    backgroundColor: "#BCFF00",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  distanceTextCol: {
+    justifyContent: "center",
+  },
+  distanceLabel: {
+    fontFamily: FONTS.bold,
+    fontSize: fontSize(15),
+    color: "#BCFF00",
+    letterSpacing: 0.5,
+  },
+  distanceSubText: {
+    fontFamily: FONTS.medium,
+    fontSize: fontSize(9),
+    color: "rgba(255, 255, 255, 0.7)",
+  },
+  distanceValueText: {
+    fontFamily: FONTS.bold,
+    fontSize: fontSize(18),
+    color: COLORS.white,
   },
   mapClip: {
     height: hp(32),
-    overflow: 'hidden',
+    overflow: "hidden",
     borderRadius: moderateScale(14),
     borderWidth: 1,
-    borderColor: 'rgba(14, 59, 46, 0.14)',
+    borderColor: "rgba(14, 59, 46, 0.14)",
   },
   mapClipCompact: {
     height: hp(24),
+  },
+  mapClipHidden: {
+    height: 0,
+    opacity: 0,
+    overflow: "hidden",
+    borderWidth: 0,
+    marginTop: 0,
+    marginBottom: 0,
   },
   map: {
     flex: 1,
@@ -908,11 +1019,11 @@ const styles = StyleSheet.create({
     width: moderateScale(24),
     height: moderateScale(24),
     borderRadius: moderateScale(6),
-    backgroundColor: '#F97316',
+    backgroundColor: "#F97316",
     borderWidth: 2,
     borderColor: COLORS.white,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
   },
   teeMarkerText: {
     fontFamily: FONTS.bold,
@@ -922,8 +1033,8 @@ const styles = StyleSheet.create({
   hint: {
     borderRadius: moderateScale(8),
     borderWidth: 1,
-    borderColor: 'rgba(14, 59, 46, 0.12)',
-    backgroundColor: 'rgba(14, 59, 46, 0.05)',
+    borderColor: "rgba(14, 59, 46, 0.12)",
+    backgroundColor: "rgba(14, 59, 46, 0.05)",
     paddingHorizontal: wp(3),
     paddingVertical: hp(0.8),
   },
@@ -935,23 +1046,22 @@ const styles = StyleSheet.create({
   geoError: {
     fontFamily: FONTS.regular,
     fontSize: fontSize(10.5),
-    color: '#92400E',
+    color: "#92400E",
   },
   notice: {
     borderRadius: moderateScale(12),
     borderWidth: 1,
-    borderColor: '#FDE68A',
-    backgroundColor: '#FEF9E7',
+    borderColor: "#FDE68A",
+    backgroundColor: "#FEF9E7",
     paddingHorizontal: wp(4),
     paddingVertical: hp(1.4),
   },
   noticeText: {
     fontFamily: FONTS.regular,
     fontSize: fontSize(11.5),
-    color: '#92400E',
+    color: "#92400E",
     lineHeight: fontSize(17),
   },
 });
 
 export default HoleMap;
-

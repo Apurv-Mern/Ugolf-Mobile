@@ -15,11 +15,49 @@ export const haversineMeters = (a, b) => {
   return 2 * EARTH_RADIUS_M * Math.asin(Math.min(1, Math.sqrt(h)));
 };
 
-export const formatDistance = (meters) => {
-  // const yards = meters * 1.09361;
-  // if (yards < 30) return `${Math.round(yards)} yd`;
-  // return `${Math.round(yards)} yd (${Math.round(meters)} m)`;
-  return `${Math.round(meters)} m`;
+/** Distance label in metres only. */
+export const formatMeters = (meters) => {
+  if (meters == null) return 'Unavailable';
+  const n = Number(meters);
+  if (!Number.isFinite(n) || n <= 0) return 'Unavailable';
+  return `${Math.round(n)} m`;
+};
+
+export const formatDistance = formatMeters;
+
+export const formatShotDistance = formatMeters;
+
+export const NEAR_COURSE_M = 2500;
+
+const isCoord = (p) =>
+  p && Number.isFinite(Number(p.lat)) && Number.isFinite(Number(p.lng));
+
+/** Course has cached map data and a green POI for the current hole. */
+export const canComputeToGreen = (mapData) =>
+  Boolean(mapData?.hasGps && isCoord(mapData?.green));
+
+const teeFromMap = (mapData) => {
+  if (isCoord(mapData?.tee)) return mapData.tee;
+  for (const poi of mapData?.currentHolePois || []) {
+    const kind = Number(poi?.poi);
+    if ((kind === 11 || kind === 12) && isCoord(poi)) return poi;
+  }
+  return null;
+};
+
+/** Tee → green from cached course map only (never device GPS). */
+export const mapToGreenMeters = (mapData) => {
+  const fromApi = mapData?.toGreenMeters;
+  if (fromApi != null) {
+    const n = Number(fromApi);
+    if (Number.isFinite(n) && n > 0) return n;
+  }
+  if (!canComputeToGreen(mapData)) return null;
+  const tee = teeFromMap(mapData);
+  if (!isCoord(tee)) return null;
+  const meters = haversineMeters(tee, mapData.green);
+  if (!Number.isFinite(meters) || meters <= 0) return null;
+  return Math.round(meters);
 };
 
 export const poiLabel = (poi) => {
@@ -56,9 +94,6 @@ export const poiColor = (poi) => {
       return '#94a3b8';
   }
 };
-
-const isCoord = (p) =>
-  p && Number.isFinite(Number(p.lat)) && Number.isFinite(Number(p.lng));
 
 /** Every hole point the camera should frame: green, tee and all POIs. */
 export const holePoints = (mapData) => {

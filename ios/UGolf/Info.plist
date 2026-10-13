@@ -7,7 +7,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>en</string>
 	<key>CFBundleDisplayName</key>
-	<string>UGolf</string>
+	<string>Universal Golf</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIconFiles</key>
@@ -55,7 +55,15 @@
 		<true/>
 	</dict>
 	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>UGolf shows your position on the hole map and distance to the green while you play.</string>
+	<string>Universal Golf shows your position on the hole map and distance to the green while you play.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>Universal Golf needs camera access to take profile photos and event photos.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Universal Golf needs photo library access to upload profile photos and event images.</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>Universal Golf needs access to save photos to your library.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Universal Golf needs microphone access for video recordings.</string>
 	<key>RCTNewArchEnabled</key>
 	<true/>
 	<key>UIAppFonts</key>

@@ -29,22 +29,14 @@ export const shareTournamentLink = async (tournament) => {
     `https://ugolf-frontend.24livehost.com/tournaments/${tournament.id || tournament._id}`;
 
   const name = tournament.name || tournament.title || 'Golf Tournament';
-  const shareMessage = `Join my tournament "${name}" on UGolf!\n\n📲 Open in UGolf App:\n${appDeepLink}\n\n🌐 Web Link:\n${joinUrl}`;
+  const shareMessage = `Join my tournament "${name}" on Universal Golf!\n\n📲 Open in Universal Golf App:\n${appDeepLink}\n\n🌐 Web Link:\n${joinUrl}`;
 
   try {
-    const result = await Share.share(
+    await Share.share(
       Platform.OS === 'ios'
-        ? { title: `Join ${name} on UGolf`, message: shareMessage, url: appDeepLink }
-        : { title: `Join ${name} on UGolf`, message: shareMessage }
+        ? { title: `Join ${name} on Universal Golf`, message: shareMessage, url: appDeepLink }
+        : { title: `Join ${name} on Universal Golf`, message: shareMessage }
     );
-
-    if (result.action === Share.sharedAction) {
-      Toast.show({
-        type: 'success',
-        text1: 'Link Shared',
-        text2: 'Tournament join link shared successfully!',
-      });
-    }
   } catch (error) {
     console.log('Error sharing tournament link:', error);
     Toast.show({

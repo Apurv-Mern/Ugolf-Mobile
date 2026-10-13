@@ -1,8 +1,10 @@
+import { resolveDevBaseUrl } from './devConfig';
+
+// Production / staging:
 // const BASE_URL = 'https://ugolf-backend.24livehost.com:5011';
-// const BASE_URL = 'https://ugolf-backend.24livehost.com';
-// const BASE_URL = 'http://localhost:4000'; // works on iOS simulator only
-// const BASE_URL = 'http://192.168.10.186:4000'; // physical device on same Wi‑Fi
-const BASE_URL = "http://10.0.2.2:4000"; // Android emulator → host machine localhost:4000
+
+/** Local dev — see devConfig.js (LAN IP for phone, 10.0.2.2 for emulator). */
+const BASE_URL = resolveDevBaseUrl();
 
 export const ENDPOINTS = {
   LOGIN: "/api/v1/mobile/auth/login",
@@ -18,6 +20,7 @@ export const ENDPOINTS = {
   // Player profile / subscription / history
   PLAYER_ME: "/api/v1/mobile/players/me",
   PLAYER_SUBSCRIPTION: "/api/v1/mobile/players/me/subscription",
+  VERIFY_GOOGLE_PURCHASE: "/api/v1/mobile/payments/verify-google-purchase",
   PLAYER_GAME_HISTORY: "/api/v1/mobile/players/me/game-history",
 
   TOURNAMENTS: "/api/v1/mobile/tournaments",
@@ -25,6 +28,17 @@ export const ENDPOINTS = {
   TOURNAMENT_LEADERBOARD: (id) =>
     `/api/v1/mobile/tournaments/${id}/leaderboard`,
   CONFIGURE_GAMES: (id) => `/api/v1/mobile/tournaments/${id}/configure-games`,
+  SHOTGUN: (id) => `/api/v1/mobile/tournaments/${id}/shotgun`,
+  SHOTGUN_ASSIGN: (id, gameNumber) =>
+    `/api/v1/mobile/tournaments/${id}/shotgun/${gameNumber}/assign`,
+  SHOTGUN_CLAIM: (id, gameNumber) =>
+    `/api/v1/mobile/tournaments/${id}/shotgun/${gameNumber}/claim`,
+  SHOTGUN_START: (id, gameNumber) =>
+    `/api/v1/mobile/tournaments/${id}/shotgun/${gameNumber}/start`,
+  SHOTGUN_START_ALL: (id) =>
+    `/api/v1/mobile/tournaments/${id}/shotgun/start-all`,
+  SHOTGUN_PICK_UP: (tournamentId, sessionId) =>
+    `/api/v1/mobile/tournaments/${tournamentId}/game-sessions/${sessionId}/pick-up`,
   GET_CLUBS: "/api/v1/mobile/courses/clubs",
   GET_COURSES: "/api/v1/mobile/courses",
   GET_COUNTRIES: "/api/v1/mobile/courses/countries",
@@ -84,6 +98,8 @@ export const ENDPOINTS = {
     `/api/v1/mobile/tournaments/${tournamentId}/game-sessions/${sessionId}/confirm-instruction`,
   GAME_SESSION_BACK: (tournamentId, sessionId) =>
     `/api/v1/mobile/tournaments/${tournamentId}/game-sessions/${sessionId}/back`,
+  GAME_SESSION_SHOT_DISTANCE: (tournamentId, sessionId) =>
+    `/api/v1/mobile/tournaments/${tournamentId}/game-sessions/${sessionId}/shot-distance`,
 };
 
 export default BASE_URL;

@@ -450,7 +450,7 @@
 
 
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   View,
   Text,
@@ -463,6 +463,7 @@ import {
   StatusBar,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useFocusEffect } from '@react-navigation/native';
 import AuthIcon from '../../components/common/AuthIcon';
 
 import AuthInput from '../../components/common/AuthInput';
@@ -481,7 +482,6 @@ import { useDispatch } from 'react-redux';
 import { loginApi } from '../../services/authService';
 import { setLoginData } from '../../redux/slices/authSlice';
 import { setStorageData, getStorageData, removeStorageData } from '../../storage/storage';
-import { useEffect } from 'react';
 
 const LoginScreen = ({ navigation }) => {
   const dispatch = useDispatch();
@@ -490,6 +490,29 @@ const LoginScreen = ({ navigation }) => {
   const [rememberMe, setRememberMe] = useState(false);
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState({});
+  const navLockRef = useRef(false);
+  const timerRef = useRef(null);
+
+  useFocusEffect(
+    useCallback(() => {
+      navLockRef.current = false;
+    }, [])
+  );
+
+  useEffect(() => {
+    return () => {
+      if (timerRef.current) clearTimeout(timerRef.current);
+    };
+  }, []);
+
+  const safeNavigate = (routeName, params) => {
+    if (!navigation.isFocused() || navLockRef.current) return;
+    navLockRef.current = true;
+    navigation.navigate(routeName, params);
+    setTimeout(() => {
+      navLockRef.current = false;
+    }, 1000);
+  };
 
   useEffect(() => {
     const loadRememberedEmail = async () => {
@@ -505,6 +528,7 @@ const LoginScreen = ({ navigation }) => {
 
   useEffect(() => {
     const unsubscribeFocus = navigation.addListener('focus', async () => {
+      navLockRef.current = false;
       setErrors({});
       // Reload remembered credentials
       const savedEmail = await getStorageData('REMEMBERED_EMAIL');
@@ -564,10 +588,12 @@ const LoginScreen = ({ navigation }) => {
   };
 
   const handleLogin = async () => {
+    if (loading || navLockRef.current) return;
     if (!validateForm()) {
       return;
     }
 
+    navLockRef.current = true;
     setLoading(true);
     try {
       const response = await loginApi({
@@ -600,6 +626,11 @@ const LoginScreen = ({ navigation }) => {
       }
 
       if (isEmailVerified === false) {
+        Toast.show({
+          type: 'info',
+          text1: 'Verification Required',
+          text2: 'Please verify your email before logging in.',
+        });
         navigation.navigate('EmailVerification', { email: email.trim(), sendOTP: true });
         return;
       }
@@ -627,12 +658,12 @@ const LoginScreen = ({ navigation }) => {
       Toast.show({
         type: 'success',
         text1: 'Login Successful',
-        text2: response?.message || 'Welcome back to UGolf!',
+        text2: response?.message || 'Welcome back to Universal Golf!',
       });
 
       // Login always goes directly to MainApp.
       // Subscription screen is only shown after new registration (not on login).
-      setTimeout(() => {
+      timerRef.current = setTimeout(() => {
         navigation.reset({
           index: 0,
           routes: [{ name: 'MainApp' }],
@@ -646,6 +677,11 @@ const LoginScreen = ({ navigation }) => {
         errorMsg.toLowerCase().includes('verify') ||
         errorMsg.toLowerCase().includes('verification')
       ) {
+        Toast.show({
+          type: 'info',
+          text1: 'Verification Required',
+          text2: errorMsg || 'Please verify your email before logging in.',
+        });
         navigation.navigate('EmailVerification', { email: email.trim(), sendOTP: true });
       } else {
         Toast.show({
@@ -656,6 +692,7 @@ const LoginScreen = ({ navigation }) => {
       }
     } finally {
       setLoading(false);
+      navLockRef.current = false;
     }
   };
 
@@ -745,7 +782,7 @@ const LoginScreen = ({ navigation }) => {
               </TouchableOpacity>
 
               <TouchableOpacity
-                onPress={() => navigation.navigate('ForgotPassword')}
+                onPress={() => safeNavigate('ForgotPassword')}
                 activeOpacity={0.7}
               >
                 <Text style={styles.forgotText}>Forgot Password?</Text>
@@ -762,9 +799,9 @@ const LoginScreen = ({ navigation }) => {
 
             {/* Bottom Register Link */}
             <View style={styles.registerRow}>
-              <Text style={styles.newText}>New to UGolf?</Text>
+              <Text style={styles.newText}>New to Universal Golf?</Text>
               <TouchableOpacity
-                onPress={() => navigation.navigate('SignUp')}
+                onPress={() => safeNavigate('SignUp')}
                 activeOpacity={0.7}
               >
                 <Text style={styles.registerText}>Create Account</Text>
@@ -833,7 +870,7 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.white,
     paddingHorizontal: wp(7),
     paddingTop: hp(1),
-    paddingBottom: hp(4),
+    paddingBottom: hp(8),
     position: 'relative',
   },
   dotPatternContainer: {
@@ -895,6 +932,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     marginTop: hp(3.5),
+    marginBottom: hp(4),
   },
   newText: {
     fontFamily: FONTS.medium,

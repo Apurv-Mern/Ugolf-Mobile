@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -271,6 +271,7 @@ const CreateTournamentScreen = ({ navigation, route }) => {
   const [shareLink, setShareLink] = useState(true);
   const [inviteStatus, setInviteStatus] = useState('Invite only');
   const [numberOfGames, setNumberOfGames] = useState('1');
+  const [tournamentFormat, setTournamentFormat] = useState('NORMAL');
   const initialPlayMode = String(
     route?.params?.playMode || tournamentParam?.playMode || 'PRACTICE',
   ).toUpperCase();
@@ -322,6 +323,10 @@ const CreateTournamentScreen = ({ navigation, route }) => {
             : ['Australia', 'USA', 'UK', 'New Zealand'];
         setCountriesList(countryOptions);
 
+        if (isEditing || tournamentParam || editingTournamentId) {
+          return;
+        }
+
         const player =
           profileRes?.player ||
           profileRes?.data?.player ||
@@ -349,7 +354,7 @@ const CreateTournamentScreen = ({ navigation, route }) => {
     return () => {
       cancelled = true;
     };
-  }, [currentUser?.country]);
+  }, [currentUser?.country, isEditing, tournamentParam, editingTournamentId]);
 
   // Pre-fill fields if editing an existing tournament
   useEffect(() => {
@@ -395,8 +400,14 @@ const CreateTournamentScreen = ({ navigation, route }) => {
         }
       }
 
-      if (tournamentParam.country) setCountry(tournamentParam.country);
-      if (tournamentParam.state) setState(tournamentParam.state);
+      if (tournamentParam.country) {
+        setCountry(tournamentParam.country);
+        prevCountryRef.current = tournamentParam.country;
+      }
+      if (tournamentParam.state) {
+        setState(tournamentParam.state);
+        prevStateRef.current = tournamentParam.state;
+      }
       const loc = tournamentParam.suburb || tournamentParam.city || '';
       if (loc) {
         setSuburb(loc);
@@ -434,12 +445,19 @@ const CreateTournamentScreen = ({ navigation, route }) => {
             if (!active) return;
             const fullT = res?.tournament || res?.data?.tournament || res?.data || res;
             if (fullT) {
+              isEditingPrefilled.current = true;
               if (fullT.name || fullT.title) setTournamentName(fullT.name || fullT.title);
               if (fullT.description) setDescription(fullT.description);
               if (fullT.sponsor) setSponsorName(fullT.sponsor);
               if (fullT.prize) setTournamentPrize(fullT.prize);
-              if (fullT.country) setCountry(fullT.country);
-              if (fullT.state) setState(fullT.state);
+              if (fullT.country) {
+                setCountry(fullT.country);
+                prevCountryRef.current = fullT.country;
+              }
+              if (fullT.state) {
+                setState(fullT.state);
+                prevStateRef.current = fullT.state;
+              }
               const fullLoc = fullT.suburb || fullT.city || '';
               if (fullLoc) {
                 setSuburb(fullLoc);
@@ -513,7 +531,7 @@ const CreateTournamentScreen = ({ navigation, route }) => {
   // Fetch clubs based on country and state: /api/v1/mobile/courses/clubs?country={country}&state={state}
   const loadClubs = async (countryFilter, stateFilter) => {
     try {
-      const params = { limit: 100 };
+      const params = {};
       if (countryFilter && countryFilter !== 'Select Country') {
         params.country = countryFilter;
       }
@@ -536,7 +554,7 @@ const CreateTournamentScreen = ({ navigation, route }) => {
       if (isEditingPrefilled.current) {
         isEditingPrefilled.current = false;
         loadClubs(country, state !== 'Select State' ? state : undefined);
-      } else if (prevCountryRef.current && prevCountryRef.current !== country) {
+      } else if (!isEditing && prevCountryRef.current && prevCountryRef.current !== country) {
         setState('Select State');
         setGolfClub('Select Golf Club');
         setGolfClubId('');
@@ -554,13 +572,13 @@ const CreateTournamentScreen = ({ navigation, route }) => {
       countryInitialized.current = false;
       prevCountryRef.current = country;
     }
-  }, [country]);
+  }, [country, isEditing]);
 
   useEffect(() => {
     if (country && country !== 'Select Country' && state && state !== 'Select State') {
       if (isSelectingClubRef.current) {
         isSelectingClubRef.current = false;
-      } else if (prevStateRef.current && prevStateRef.current !== state) {
+      } else if (!isEditing && prevStateRef.current && prevStateRef.current !== state) {
         setGolfClub('Select Golf Club');
         setGolfClubId('');
         setClubHasMap(null);
@@ -572,7 +590,7 @@ const CreateTournamentScreen = ({ navigation, route }) => {
       loadClubs(country, state);
       prevStateRef.current = state;
     }
-  }, [state]);
+  }, [state, country, isEditing]);
 
   useFocusEffect(
     React.useCallback(() => {
@@ -586,7 +604,11 @@ const CreateTournamentScreen = ({ navigation, route }) => {
     }, [navigation])
   );
 
+  const pickerLockRef = useRef(false);
+
   const handleOpenDropdown = (type, currentOptions, setter) => {
+    if (pickerLockRef.current) return;
+    pickerLockRef.current = true;
     setDropdownSearchQuery('');
     setDropdownOptions(currentOptions);
     setDropdownCallback(() => (val) => {
@@ -595,6 +617,33 @@ const CreateTournamentScreen = ({ navigation, route }) => {
       if (type === 'state') setStateError('');
     });
     setActiveDropdown(type);
+    setTimeout(() => {
+      pickerLockRef.current = false;
+    }, 500);
+  };
+
+  // Open dynamic Country dropdown
+  const handleOpenCountryDropdown = () => {
+    const options =
+      countriesList.length > 0
+        ? countriesList
+        : ['Australia', 'USA', 'UK', 'New Zealand', 'India'];
+    handleOpenDropdown('country', options, (selectedCountry) => {
+      setCountryError('');
+      if (selectedCountry !== country) {
+        setCountry(selectedCountry);
+        setState('Select State');
+        setGolfClub('Select Golf Club');
+        setGolfClubId('');
+        setClubHasMap(null);
+        setSuburb('');
+        setCity('');
+        setStateError('');
+        setGolfClubError('');
+        setSuburbError('');
+        setCityError('');
+      }
+    });
   };
 
   // Open dynamic State dropdown based on selected Country
@@ -609,17 +658,19 @@ const CreateTournamentScreen = ({ navigation, route }) => {
     }
 
     const options = statesList.length > 0 ? statesList : ['NSW', 'VIC', 'QLD', 'WA', 'SA', 'TAS'];
-    handleOpenDropdown('state', options, (val) => {
-      setState(val);
+    handleOpenDropdown('state', options, (selectedState) => {
       setStateError('');
-      // When user manually picks a new state from State dropdown, reset Golf Club & Suburb/City
-      setGolfClub('Select Golf Club');
-      setGolfClubId('');
-      setClubHasMap(null);
-      setSuburb('');
-      setCity('');
-      setGolfClubError('');
-      setSuburbError('');
+      if (selectedState !== state) {
+        setState(selectedState);
+        setGolfClub('Select Golf Club');
+        setGolfClubId('');
+        setClubHasMap(null);
+        setSuburb('');
+        setCity('');
+        setGolfClubError('');
+        setSuburbError('');
+        setCityError('');
+      }
     });
   };
 
@@ -730,6 +781,8 @@ const CreateTournamentScreen = ({ navigation, route }) => {
   };
 
   const handleOpenDatePicker = () => {
+    if (pickerLockRef.current) return;
+    pickerLockRef.current = true;
     if (!startDate) {
       const todayStr = formatDateString(new Date());
       setStartDate(todayStr);
@@ -745,10 +798,15 @@ const CreateTournamentScreen = ({ navigation, route }) => {
     }
     if (startDateError) setStartDateError('');
     setShowDatePicker(true);
+    setTimeout(() => {
+      pickerLockRef.current = false;
+    }, 500);
   };
 
   const handleCreateTournament = async () => {
+    if (submitting || pickerLockRef.current) return;
     if (isEditing && challengeLocked) {
+      pickerLockRef.current = false;
       Toast.show({
         type: 'info',
         text1: 'Challenge Locked',
@@ -757,6 +815,7 @@ const CreateTournamentScreen = ({ navigation, route }) => {
       navigation.goBack();
       return;
     }
+    pickerLockRef.current = true;
     setSubmissionError('');
     setTournamentNameError('');
     setDescriptionError('');
@@ -809,6 +868,7 @@ const CreateTournamentScreen = ({ navigation, route }) => {
     }
 
     if (hasError) {
+      pickerLockRef.current = false;
       Toast.show({
         type: 'error',
         text1: 'Validation Error',
@@ -844,6 +904,7 @@ const CreateTournamentScreen = ({ navigation, route }) => {
       const resolvedClubName = golfClub && golfClub !== 'Select Golf Club' ? golfClub : (matchedClub?.clubName || matchedClub?.name || '');
 
       if (!resolvedClubId) {
+        pickerLockRef.current = false;
         Toast.show({
           type: 'error',
           text1: 'Golf Club Required',
@@ -862,6 +923,7 @@ const CreateTournamentScreen = ({ navigation, route }) => {
         startDate: startDate.trim(),
         inviteStatus: mapInviteStatus(inviteStatus),
         playMode: playModeParam,
+        tournamentFormat: tournamentFormat === 'SHOTGUN' ? 'SHOTGUN' : 'NORMAL',
         invitesEnabled: !!allowInvites,
         shareLinkEnabled: !!shareLink,
         teamSize: teamSizeParam,
@@ -1016,6 +1078,7 @@ const CreateTournamentScreen = ({ navigation, route }) => {
       });
     } finally {
       setSubmitting(false);
+      pickerLockRef.current = false;
     }
   };
 
@@ -1092,15 +1155,7 @@ const CreateTournamentScreen = ({ navigation, route }) => {
         <Text style={styles.formLabel}>Country</Text>
         <TouchableOpacity
           style={styles.formDropdownTrigger}
-          onPress={() =>
-            handleOpenDropdown(
-              'country',
-              countriesList.length > 0
-                ? countriesList
-                : ['Australia', 'USA', 'UK', 'New Zealand'],
-              setCountry,
-            )
-          }
+          onPress={handleOpenCountryDropdown}
           activeOpacity={0.8}
         >
           <Text style={styles.dropdownValueText}>{country}</Text>
@@ -1273,34 +1328,38 @@ const CreateTournamentScreen = ({ navigation, route }) => {
         </TouchableOpacity>
         */}
 
-        {/* Checkbox Rows */}
-        <TouchableOpacity
-          style={[styles.checkboxOptionRow, { marginTop: hp(1.5) }]}
-          onPress={() => setAllowInvites(!allowInvites)}
-          activeOpacity={0.7}
-        >
-          <View style={[styles.checkboxBox, allowInvites && styles.checkboxBoxChecked]}>
-            {allowInvites && <AuthIcon name="check" size={moderateScale(12)} color={COLORS.white} />}
-          </View>
-          <View style={styles.checkboxTextContainer}>
-            <Text style={styles.checkboxTitleText}>Allow invites</Text>
-            <Text style={styles.checkboxSubText}>Send invites to players or teams</Text>
-          </View>
-        </TouchableOpacity>
+        {/* Checkbox Rows - Hidden for Practice tournament mode (P2P), visible only in Challenge mode */}
+        {isChallengeMode ? (
+          <>
+            <TouchableOpacity
+              style={[styles.checkboxOptionRow, { marginTop: hp(1.5) }]}
+              onPress={() => setAllowInvites(!allowInvites)}
+              activeOpacity={0.7}
+            >
+              <View style={[styles.checkboxBox, allowInvites && styles.checkboxBoxChecked]}>
+                {allowInvites && <AuthIcon name="check" size={moderateScale(12)} color={COLORS.white} />}
+              </View>
+              <View style={styles.checkboxTextContainer}>
+                <Text style={styles.checkboxTitleText}>Allow invites</Text>
+                <Text style={styles.checkboxSubText}>Send invites to players or teams</Text>
+              </View>
+            </TouchableOpacity>
 
-        <TouchableOpacity
-          style={styles.checkboxOptionRow}
-          onPress={() => setShareLink(!shareLink)}
-          activeOpacity={0.7}
-        >
-          <View style={[styles.checkboxBox, shareLink && styles.checkboxBoxChecked]}>
-            {shareLink && <AuthIcon name="check" size={moderateScale(12)} color={COLORS.white} />}
-          </View>
-          <View style={styles.checkboxTextContainer}>
-            <Text style={styles.checkboxTitleText}>Share link</Text>
-            <Text style={styles.checkboxSubText}>Generate a join URL (shown after create)</Text>
-          </View>
-        </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.checkboxOptionRow}
+              onPress={() => setShareLink(!shareLink)}
+              activeOpacity={0.7}
+            >
+              <View style={[styles.checkboxBox, shareLink && styles.checkboxBoxChecked]}>
+                {shareLink && <AuthIcon name="check" size={moderateScale(12)} color={COLORS.white} />}
+              </View>
+              <View style={styles.checkboxTextContainer}>
+                <Text style={styles.checkboxTitleText}>Share link</Text>
+                <Text style={styles.checkboxSubText}>Generate a join URL (shown after create)</Text>
+              </View>
+            </TouchableOpacity>
+          </>
+        ) : null}
 
         {isChallengeMode ? (
           <>
@@ -1326,6 +1385,33 @@ const CreateTournamentScreen = ({ navigation, route }) => {
             </TouchableOpacity>
           </>
         ) : null}
+
+        <Text style={styles.formLabel}>Tournament Type</Text>
+        <TouchableOpacity
+          style={[
+            styles.formDropdownTrigger,
+            challengeLocked && { opacity: 0.55 },
+          ]}
+          onPress={() => {
+            if (challengeLocked) return;
+            handleOpenDropdown(
+              'tournamentFormat',
+              ['NORMAL', 'SHOTGUN'],
+              setTournamentFormat,
+            );
+          }}
+          activeOpacity={0.8}
+        >
+          <Text style={styles.dropdownValueText}>
+            {tournamentFormat === 'SHOTGUN' ? 'Shotgun' : 'Normal'}
+          </Text>
+          <AuthIcon
+            name="chevron-left"
+            size={moderateScale(14)}
+            color="#093A24"
+            style={{ transform: [{ rotate: '-90deg' }] }}
+          />
+        </TouchableOpacity>
 
         {/* Number Of Games (Dropdown) */}
         <Text style={styles.formLabel}>Number Of Games</Text>
