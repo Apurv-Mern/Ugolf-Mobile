@@ -111,6 +111,21 @@ export function leaderboardIndicatesStarted(res) {
   );
 }
 
+/** True when this player finished their assigned Shotgun nine. */
+export function isShotgunPlayerRoundComplete(readiness) {
+  if (!isShotgunTournamentFormat(null, readiness)) return false;
+  const completedGameNumbers = (readiness?.completedGameNumbers || []).map(Number);
+  const assigned = Number(readiness?.shotgunAssignmentGameNumber);
+  if (assigned > 0 && completedGameNumbers.includes(assigned)) {
+    return true;
+  }
+  return (
+    completedGameNumbers.length >= 1 &&
+    !readiness?.activeSession?.id &&
+    readiness?.nextGameNumber == null
+  );
+}
+
 export function classifyTournamentPlay(tournament, readiness, extras = {}) {
   const numberOfGames = Math.max(
     1,
@@ -130,11 +145,16 @@ export function classifyTournamentPlay(tournament, readiness, extras = {}) {
       tournament?.hasStarted,
   );
 
-  const allGamesDone =
-    Boolean(readiness) &&
-    completedCount >= numberOfGames &&
-    !hasActiveSession &&
-    nextGameNumber == null;
+  const shotgun = isShotgunTournamentFormat(tournament, readiness);
+
+  const allGamesDone = shotgun
+    ? Boolean(readiness) &&
+      isShotgunPlayerRoundComplete(readiness) &&
+      !hasActiveSession
+    : Boolean(readiness) &&
+      completedCount >= numberOfGames &&
+      !hasActiveSession &&
+      nextGameNumber == null;
 
   const isInProgress =
     !allGamesDone &&
@@ -144,13 +164,75 @@ export function classifyTournamentPlay(tournament, readiness, extras = {}) {
     numberOfGames,
     completedGameNumbers,
     completedCount,
-    nextGameNumber,
+    nextGameNumber: shotgun && allGamesDone ? null : nextGameNumber,
     activeSession,
     hasActiveSession,
     gameStarted,
     allGamesDone,
     isInProgress,
     isCompleted: allGamesDone,
+    isShotgun: shotgun,
+    shotgunAssignmentGameNumber:
+      readiness?.shotgunAssignmentGameNumber != null
+        ? Number(readiness.shotgunAssignmentGameNumber)
+        : null,
+  };
+}
+
+/** Home / in-progress card copy for Shotgun (one nine per player, not sequential games). */
+export function liveRoundLabelsForTournament(item, sessionRes) {
+  const tournament = item?.tournament || item;
+  const shotgun = isShotgunTournamentFormat(tournament, {
+    tournamentFormat: item?.tournamentFormat || tournament?.tournamentFormat,
+  });
+
+  if (!shotgun) return null;
+
+  if (item?.hasActiveSession && item?.activeSession?.id && sessionRes) {
+    const holeStart = Number(sessionRes?.holeStart) || 1;
+    const holeEnd = Number(sessionRes?.holeEnd) || 18;
+    const totalHoles = Math.max(1, holeEnd - holeStart + 1);
+    const session = item.activeSession;
+    const holeIndex = Math.min(
+      totalHoles,
+      Math.max(1, (Number(session.currentHole) || holeStart) - holeStart + 1),
+    );
+    return {
+      holeLabel: `Hole ${holeIndex} / ${totalHoles}`,
+      holeIndex,
+      totalHoles,
+      progress: holeIndex / totalHoles,
+      badge: 'GAME STARTED',
+      actionLabel: 'CONTINUE',
+    };
+  }
+
+  const playerDone = isShotgunPlayerRoundComplete({
+    tournamentFormat: 'SHOTGUN',
+    completedGameNumbers: item?.completedGameNumbers,
+    shotgunAssignmentGameNumber: item?.shotgunAssignmentGameNumber,
+    nextGameNumber: item?.nextGameNumber,
+    activeSession: item?.activeSession,
+  });
+
+  if (playerDone) {
+    return {
+      holeLabel: 'Complete',
+      holeIndex: 9,
+      totalHoles: 9,
+      progress: 1,
+      badge: 'COMPLETE',
+      actionLabel: 'VIEW LEADERBOARD',
+    };
+  }
+
+  return {
+    holeLabel: 'Your nine',
+    holeIndex: 0,
+    totalHoles: 9,
+    progress: 0,
+    badge: item?.gameStarted ? 'GAME STARTED' : 'IN PROGRESS',
+    actionLabel: item?.nextGameNumber != null ? 'CONTINUE' : 'VIEW LEADERBOARD',
   };
 }
 
@@ -243,4 +325,26 @@ export function groupGameHistoryByTournament(history) {
   }
 
   return order.map((id) => map.get(id));
+}
+
+/** Display label for tournament format on list cards. */
+export function resolveTournamentFormatLabel(tournament, readiness) {
+  const fmt = String(
+    tournament?.tournamentFormat ||
+      tournament?.format ||
+      readiness?.tournamentFormat ||
+      'NORMAL',
+  ).toUpperCase();
+  return fmt === 'SHOTGUN' ? 'Shotgun' : 'Normal';
+}
+
+export function isShotgunTournamentFormat(tournament, readiness) {
+  return (
+    String(
+      tournament?.tournamentFormat ||
+        tournament?.format ||
+        readiness?.tournamentFormat ||
+        'NORMAL',
+    ).toUpperCase() === 'SHOTGUN'
+  );
 }

@@ -271,6 +271,7 @@ const CreateTournamentScreen = ({ navigation, route }) => {
   const [shareLink, setShareLink] = useState(true);
   const [inviteStatus, setInviteStatus] = useState('Invite only');
   const [numberOfGames, setNumberOfGames] = useState('1');
+  const [tournamentFormat, setTournamentFormat] = useState('NORMAL');
   const initialPlayMode = String(
     route?.params?.playMode || tournamentParam?.playMode || 'PRACTICE',
   ).toUpperCase();
@@ -922,6 +923,7 @@ const CreateTournamentScreen = ({ navigation, route }) => {
         startDate: startDate.trim(),
         inviteStatus: mapInviteStatus(inviteStatus),
         playMode: playModeParam,
+        tournamentFormat: tournamentFormat === 'SHOTGUN' ? 'SHOTGUN' : 'NORMAL',
         invitesEnabled: !!allowInvites,
         shareLinkEnabled: !!shareLink,
         teamSize: teamSizeParam,
@@ -1383,6 +1385,33 @@ const CreateTournamentScreen = ({ navigation, route }) => {
             </TouchableOpacity>
           </>
         ) : null}
+
+        <Text style={styles.formLabel}>Tournament Type</Text>
+        <TouchableOpacity
+          style={[
+            styles.formDropdownTrigger,
+            challengeLocked && { opacity: 0.55 },
+          ]}
+          onPress={() => {
+            if (challengeLocked) return;
+            handleOpenDropdown(
+              'tournamentFormat',
+              ['NORMAL', 'SHOTGUN'],
+              setTournamentFormat,
+            );
+          }}
+          activeOpacity={0.8}
+        >
+          <Text style={styles.dropdownValueText}>
+            {tournamentFormat === 'SHOTGUN' ? 'Shotgun' : 'Normal'}
+          </Text>
+          <AuthIcon
+            name="chevron-left"
+            size={moderateScale(14)}
+            color="#093A24"
+            style={{ transform: [{ rotate: '-90deg' }] }}
+          />
+        </TouchableOpacity>
 
         {/* Number Of Games (Dropdown) */}
         <Text style={styles.formLabel}>Number Of Games</Text>

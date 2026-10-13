@@ -559,7 +559,17 @@ import { getTournamentTeamsApi, getTeamsApi, getTeamByIdApi } from '../../servic
 import { getStartGameReadinessApi } from '../../services/playService';
 import { getTournamentLeaderboardApi } from '../../services/playerService';
 import { shareTournamentLink } from '../../utils/shareUtils';
-import { classifyTournamentPlay, leaderboardIndicatesStarted, unwrapReadiness, isChallengeLocked } from '../../utils/playProgress';
+import {
+  classifyTournamentPlay,
+  leaderboardIndicatesStarted,
+  unwrapReadiness,
+  isChallengeLocked,
+  resolveTournamentFormatLabel,
+} from '../../utils/playProgress';
+import {
+  isShotgunTournamentItem,
+  openShotgunTournament,
+} from '../../utils/shotgunNavigation';
 
 import AuthButton from '../../components/common/AuthButton';
 import AuthIcon from '../../components/common/AuthIcon';
@@ -937,30 +947,44 @@ const SelectTournamentScreen = ({ navigation, route }) => {
           {/* Top Row: Mode Badge on Left, Action Buttons & Selection Circle on Right */}
           <View style={styles.cardTopRow}>
             {/* Mode Badge */}
-            {(() => {
-              const modeStr = String(item.playMode || '').toLowerCase();
-              const isChallenge = modeStr.includes('challenge');
-              if (!modeStr) return <View />;
-              return (
-                <View
-                  style={[
-                    styles.modeBadgeInline,
-                    isChallenge ? styles.modeBadgeChallenge : styles.modeBadgePractice,
-                  ]}
-                >
-                  <Text
+            <View style={styles.cardTopLeftBadges}>
+              <View
+                style={[
+                  styles.formatBadgeInline,
+                  resolveTournamentFormatLabel(item) === 'Shotgun'
+                    ? styles.formatBadgeShotgun
+                    : styles.formatBadgeNormal,
+                ]}
+              >
+                <Text style={styles.formatBadgeText}>
+                  {resolveTournamentFormatLabel(item)}
+                </Text>
+              </View>
+              {(() => {
+                const modeStr = String(item.playMode || '').toLowerCase();
+                const isChallenge = modeStr.includes('challenge');
+                if (!modeStr) return null;
+                return (
+                  <View
                     style={[
-                      styles.modeBadgeText,
-                      isChallenge
-                        ? styles.modeBadgeTextChallenge
-                        : styles.modeBadgeTextPractice,
+                      styles.modeBadgeInline,
+                      isChallenge ? styles.modeBadgeChallenge : styles.modeBadgePractice,
                     ]}
                   >
-                    {isChallenge ? 'Challenge' : 'Practice'}
-                  </Text>
-                </View>
-              );
-            })()}
+                    <Text
+                      style={[
+                        styles.modeBadgeText,
+                        isChallenge
+                          ? styles.modeBadgeTextChallenge
+                          : styles.modeBadgeTextPractice,
+                      ]}
+                    >
+                      {isChallenge ? 'Challenge' : 'Practice'}
+                    </Text>
+                  </View>
+                );
+              })()}
+            </View>
 
             {/* Header Right Group: Status, Share, Edit, Checkmark */}
             <View style={styles.cardHeaderRightGroup}>
@@ -974,12 +998,7 @@ const SelectTournamentScreen = ({ navigation, route }) => {
                   status === 'ACTIVE';
 
                 const canEdit =
-                  item.isMine &&
-                  !isCompleted &&
-                  !isInProgress &&
-                  !item.isStarted &&
-                  !item.gameStarted &&
-                  !item.challengeLocked;
+                  item.isMine && !isCompleted && !isInProgress;
                 const isPracticeMode = String(item.playMode || item.tournament?.playMode || '').toUpperCase().includes('PRACTICE');
                 const canShare =
                   item.isMine &&
@@ -1188,6 +1207,11 @@ const SelectTournamentScreen = ({ navigation, route }) => {
                   playMode,
                   gameNumber: selectedT.nextGameNumber || 1,
                   selectedGameIndex: Math.max(0, (selectedT.nextGameNumber || 1) - 1),
+                });
+              } else if (isShotgunTournamentItem(selectedT)) {
+                void openShotgunTournament(navigation, selectedT, {
+                  currentUserId,
+                  playMode,
                 });
               } else if (
                 selectedT.source === 'invited' ||
@@ -1421,6 +1445,35 @@ const styles = StyleSheet.create({
     fontSize: fontSize(9.5),
     color: '#BCFF00',
     letterSpacing: 0.3,
+  },
+  cardTopLeftBadges: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    gap: wp(1.5),
+    flex: 1,
+    maxWidth: '55%',
+  },
+  formatBadgeInline: {
+    borderRadius: moderateScale(20),
+    paddingHorizontal: wp(2.5),
+    paddingVertical: hp(0.4),
+    borderWidth: 1.5,
+  },
+  formatBadgeNormal: {
+    backgroundColor: 'rgba(9, 58, 36, 0.85)',
+    borderColor: 'rgba(255, 255, 255, 0.75)',
+  },
+  formatBadgeShotgun: {
+    backgroundColor: 'rgba(9, 58, 36, 0.85)',
+    borderColor: '#BCFF00',
+  },
+  formatBadgeText: {
+    fontFamily: FONTS.bold,
+    fontSize: fontSize(10),
+    color: '#BCFF00',
+    letterSpacing: 0.4,
+    textTransform: 'uppercase',
   },
   modeBadgeInline: {
     borderRadius: moderateScale(20),

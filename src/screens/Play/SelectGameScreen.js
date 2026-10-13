@@ -849,16 +849,27 @@ const SelectGameScreen = ({ navigation, route }) => {
       if (!isMounted.current) return;
       setReadiness(data);
 
-      // Auto-advance only until the player picks a game from the list.
-      if (!userPickedGame.current) {
+      const shotgunFmt =
+        String(data?.tournamentFormat || tournament?.tournamentFormat || '')
+          .toUpperCase() === 'SHOTGUN';
+
+      // Shotgun: game comes from hole pick / readiness — never from tapping a card.
+      if (shotgunFmt || !userPickedGame.current) {
         const resumeGame = data?.activeSession?.gameNumber;
         const completedList = (data?.completedGameNumbers || []).map(Number);
         if (resumeGame != null && Number(resumeGame) !== gameNumber) {
           setGameNumber(Number(resumeGame));
           setExpanded(Number(resumeGame));
-        } else if (completedList.includes(Number(gameNumber)) && data?.nextGameNumber != null) {
+        } else if (
+          shotgunFmt &&
+          data?.shotgunAssignmentGameNumber != null
+        ) {
+          const assigned = Number(data.shotgunAssignmentGameNumber);
+          setGameNumber(assigned);
+          setExpanded(assigned);
+        } else if (data?.nextGameNumber != null && (shotgunFmt || completedList.includes(Number(gameNumber)))) {
           setGameNumber(Number(data.nextGameNumber));
-          setExpanded(Number(data.nextGameNumber));
+          if (shotgunFmt) setExpanded(Number(data.nextGameNumber));
         }
       }
     } catch (err) {
@@ -874,7 +885,7 @@ const SelectGameScreen = ({ navigation, route }) => {
     } finally {
       if (isMounted.current) setChecking(false);
     }
-  }, [hasBackend, tournamentId, gameNumber]);
+  }, [hasBackend, tournamentId, gameNumber, tournament?.tournamentFormat]);
 
   useFocusEffect(
     useCallback(() => {
@@ -899,28 +910,59 @@ const SelectGameScreen = ({ navigation, route }) => {
     readiness?.playMode || route?.params?.playMode || tournament?.playMode || '',
   ).toUpperCase();
   const isChallenge = playMode === 'CHALLENGE';
+  const tournamentFormat = String(
+    readiness?.tournamentFormat ||
+      tournament?.tournamentFormat ||
+      'NORMAL',
+  ).toUpperCase();
+  const isShotgun = tournamentFormat === 'SHOTGUN';
   const completed = (readiness?.completedGameNumbers || []).map(Number);
   const reasons = (readiness?.reasons || []).filter(Boolean);
 
-  const isCurrentGameCompleted = completed.includes(gameNumber);
+  const playGameNumber = isShotgun
+    ? Number(
+        activeSession?.gameNumber ??
+          readiness?.shotgunAssignmentGameNumber ??
+          readiness?.nextGameNumber ??
+          route?.params?.gameNumber ??
+          gameNumber,
+      ) || 1
+    : gameNumber;
+  const isCurrentGameCompleted = completed.includes(playGameNumber);
 
   const handleContinue = () => {
     if (isCurrentGameCompleted) {
       Toast.show({
         type: 'info',
         text1: 'Game Completed',
-        text2: `Game ${gameNumber} is already completed and cannot be replayed.`,
+        text2: `Game ${playGameNumber} is already completed and cannot be replayed.`,
       });
       return;
     }
 
-    if (isChallenge && readiness?.opponentReady === false && !activeSession) {
+    if (
+      isChallenge &&
+      !isShotgun &&
+      readiness?.opponentReady === false &&
+      !activeSession
+    ) {
       Toast.show({
         type: 'error',
         text1: 'Waiting for Opponent',
         text2:
           reasons.join('. ') ||
           'Waiting for the invited opponent team to accept before Start Game.',
+      });
+      return;
+    }
+
+    if (isShotgun && readiness?.shotgunReady === false && !activeSession) {
+      Toast.show({
+        type: 'error',
+        text1: 'Shotgun setup',
+        text2:
+          reasons.join('. ') ||
+          'Pick your start hole and wait for the host to start this nine.',
       });
       return;
     }
@@ -936,13 +978,21 @@ const SelectGameScreen = ({ navigation, route }) => {
       return;
     }
 
-    const startGameNumber =
+    const shotgunStartGame =
       Number(
         activeSession?.gameNumber ??
-          (completed.includes(gameNumber) ? readiness?.nextGameNumber : gameNumber) ??
           readiness?.nextGameNumber ??
+          route?.params?.gameNumber ??
           gameNumber,
       ) || 1;
+    const startGameNumber = isShotgun
+      ? shotgunStartGame
+      : Number(
+          activeSession?.gameNumber ??
+            (completed.includes(gameNumber) ? readiness?.nextGameNumber : gameNumber) ??
+            readiness?.nextGameNumber ??
+            gameNumber,
+        ) || 1;
     navigation.navigate('GameRules', {
       ...route?.params,
       tournament,
@@ -968,6 +1018,20 @@ const SelectGameScreen = ({ navigation, route }) => {
         ]}
       >
         {ok ? 'Yes' : 'No'}
+      </Text>
+    </View>
+  );
+
+  const renderCheckRowText = (label, text, ok = true) => (
+    <View style={styles.checkRow} key={label}>
+      <Text style={styles.checkLabel}>{label}</Text>
+      <Text
+        style={[
+          styles.checkValue,
+          ok ? styles.checkValueYes : styles.checkValueNo,
+        ]}
+      >
+        {text}
       </Text>
     </View>
   );
@@ -1014,8 +1078,12 @@ const SelectGameScreen = ({ navigation, route }) => {
               </Text>
             ) : (
               <Text style={styles.readinessSubtitle}>
-                Checking Game {gameNumber}
-                {isChallenge ? ' · Challenge' : ' · Practice'}
+                Checking Game {isShotgun ? playGameNumber : gameNumber}
+                {isShotgun
+                  ? ' · Shotgun'
+                  : isChallenge
+                    ? ' · Challenge'
+                    : ' · Practice'}
               </Text>
             )}
           </View>
@@ -1037,9 +1105,32 @@ const SelectGameScreen = ({ navigation, route }) => {
         <View style={styles.checkList}>
           {renderCheckRow('Course configured', Boolean(readiness.courseConfigured))}
           {renderCheckRow('Team selected', Boolean(readiness.teamReady))}
-          {isChallenge
-            ? renderCheckRow('Opponent accepted', Boolean(readiness.opponentReady))
+          {isShotgun
+            ? renderCheckRowText(
+                'Total teams',
+                readiness.maxTeamSlots != null
+                  ? `${readiness.linkedTeamCount ?? 0} / ${readiness.maxTeamSlots}`
+                  : String(readiness.linkedTeamCount ?? 0),
+                (readiness.linkedTeamCount ?? 0) >= 1,
+              )
+            : isChallenge
+              ? renderCheckRow(
+                  'Opponent accepted',
+                  Boolean(readiness.opponentReady),
+                )
+              : null}
+          {isShotgun
+            ? renderCheckRow(
+                'Shotgun ready',
+                Boolean(readiness.shotgunReady),
+              )
             : null}
+          {isShotgun && !readiness.shotgunReady && !activeSession ? (
+            <Text style={styles.shotgunReadyHint}>
+              Yes when your team has picked a start hole (any configured game)
+              and the host has started shotgun.
+            </Text>
+          ) : null}
           {/* {renderCheckRow('Game rules seeded', Boolean(readiness.rulesReady))} */}
           {renderCheckRow('Map GPS (optional)', Boolean(readiness.mapReady), true)}
         </View>
@@ -1058,10 +1149,15 @@ const SelectGameScreen = ({ navigation, route }) => {
 
         {completed.length > 0 ? (
           <Text style={styles.completedText}>
-            Completed: Game {completed.join(', ')}
-            {readiness.nextGameNumber != null
-              ? ` · Next: Game ${readiness.nextGameNumber}`
-              : ' · All nines done'}
+            {isShotgun
+              ? readiness.nextGameNumber == null
+                ? 'Your assigned nine is complete.'
+                : `Completed: Game ${completed.join(', ')}`
+              : `Completed: Game ${completed.join(', ')}${
+                  readiness.nextGameNumber != null
+                    ? ` · Next: Game ${readiness.nextGameNumber}`
+                    : ' · All nines done'
+                }`}
           </Text>
         ) : null}
 
@@ -1083,7 +1179,7 @@ const SelectGameScreen = ({ navigation, route }) => {
 
   const renderGameCard = (game) => {
     const isOpen = expanded === game.gameNumber;
-    const isSelected = gameNumber === game.gameNumber;
+    const isSelected = !isShotgun && gameNumber === game.gameNumber;
     const isDone = completed.includes(game.gameNumber);
     const isActive = Number(activeSession?.gameNumber) === game.gameNumber;
 
@@ -1095,9 +1191,11 @@ const SelectGameScreen = ({ navigation, route }) => {
         <TouchableOpacity
           style={styles.gameCardHeader}
           onPress={() => {
-            userPickedGame.current = true;
             setExpanded(isOpen ? null : game.gameNumber);
-            setGameNumber(game.gameNumber);
+            if (!isShotgun) {
+              userPickedGame.current = true;
+              setGameNumber(game.gameNumber);
+            }
           }}
           activeOpacity={0.8}
         >
@@ -1158,7 +1256,11 @@ const SelectGameScreen = ({ navigation, route }) => {
         <CircularBackButton onPress={handleBackNavigation} />
         <ScreenHeader
           title="Select Game"
-          subtitle="Check everyone is ready, then pick the nine you want to play"
+          subtitle={
+            isShotgun
+              ? 'Review each nine below. Your start hole was chosen in Shotgun setup.'
+              : 'Check everyone is ready, then pick the nine you want to play'
+          }
           titleStyle={styles.title}
         />
       </View>
@@ -1190,13 +1292,15 @@ const SelectGameScreen = ({ navigation, route }) => {
         />
         {isCurrentGameCompleted ? (
           <Text style={styles.blockedHint}>
-            Game {gameNumber} is already completed and cannot be replayed. Select another game.
+            Game {playGameNumber} is already completed and cannot be replayed. Select another game.
           </Text>
         ) : hasBackend && !canStart ? (
           <Text style={styles.blockedHint}>
-            {isChallenge && readiness?.opponentReady === false
-              ? 'Waiting for the invited opponent team to accept.'
-              : 'Finish the checklist above to start this game.'}
+            {isShotgun && readiness?.shotgunReady === false
+              ? 'Complete shotgun setup for this nine (your start hole + host start).'
+              : isChallenge && readiness?.opponentReady === false
+                ? 'Waiting for the invited opponent team to accept.'
+                : 'Finish the checklist above to start this game.'}
           </Text>
         ) : null}
       </View>
@@ -1330,6 +1434,13 @@ const styles = StyleSheet.create({
     fontSize: fontSize(12),
     color: AMBER,
     lineHeight: fontSize(18),
+  },
+  shotgunReadyHint: {
+    fontFamily: FONTS.regular,
+    fontSize: fontSize(11),
+    color: 'rgba(255, 255, 255, 0.55)',
+    marginTop: hp(0.6),
+    lineHeight: fontSize(16),
   },
   completedText: {
     fontFamily: FONTS.regular,

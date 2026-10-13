@@ -78,6 +78,13 @@ const ConfigureGamesScreen = ({ navigation, route }) => {
   );
 
   const statusUpper = String(tournament?.status || configData?.status || '').toUpperCase();
+  const tournamentFormatUpper = String(
+    tournament?.tournamentFormat ??
+      tournament?.format ??
+      configData?.tournamentFormat ??
+      '',
+  ).toUpperCase();
+  const isShotgunFormat = tournamentFormatUpper === 'SHOTGUN';
   const isStarted =
     challengeLocked === true ||
     tournament?.challengeLocked === true ||
@@ -204,6 +211,12 @@ const ConfigureGamesScreen = ({ navigation, route }) => {
           const fullT = tDetail?.tournament || tDetail?.data?.tournament || tDetail?.data || tDetail;
           if (fullT?.challengeLocked === true) setChallengeLocked(true);
           if (fullT?.gameStarted === true) setGameStarted(true);
+          if (fullT?.tournamentFormat && isMounted.current) {
+            setConfigData((prev) => ({
+              ...(prev || {}),
+              tournamentFormat: fullT.tournamentFormat,
+            }));
+          }
         } catch (startedErr) {
           console.log('Tournament started check note:', startedErr);
         }
@@ -389,7 +402,8 @@ const ConfigureGamesScreen = ({ navigation, route }) => {
     if (saving || modalLockRef.current) return;
     modalLockRef.current = true;
     setTimeout(() => { modalLockRef.current = false; }, 500);
-    if (!isCreator || isStarted) {
+    // Shotgun creators setting up an upcoming event must never jump to Select Game (readiness).
+    if (!isCreator || (isStarted && !(isCreator && isShotgunFormat))) {
       // Invitee or Locked/Started mode: skip re-saving configuration, proceed directly
       if (!isCreator) {
         const gameNumber = (selectedGameIndex != null ? Number(selectedGameIndex) : 0) + 1;
@@ -416,6 +430,17 @@ const ConfigureGamesScreen = ({ navigation, route }) => {
               return;
             }
 
+            const inviteeFmt = tournament?.tournamentFormat ?? tournament?.format;
+            if (String(inviteeFmt).toUpperCase() === 'SHOTGUN') {
+              navigation.navigate('ShotgunLobby', {
+                ...route?.params,
+                tournamentId,
+                tournament,
+                selectedTeam,
+              });
+              return;
+            }
+
             navigation.navigate('SelectGame', {
               ...route?.params,
               tournament,
@@ -438,7 +463,7 @@ const ConfigureGamesScreen = ({ navigation, route }) => {
         }
       }
 
-      if (challengeLocked || isStarted) {
+      if ((challengeLocked || isStarted) && !isShotgunFormat) {
         navigation.navigate('SelectGame', {
           ...route?.params,
           tournament,
@@ -446,6 +471,22 @@ const ConfigureGamesScreen = ({ navigation, route }) => {
           selectedGameIndex,
           gameNumber: (selectedGameIndex != null ? Number(selectedGameIndex) : 0) + 1,
           playMode: route?.params?.playMode || tournament?.playMode || 'challenge',
+        });
+        return;
+      }
+
+      if (isShotgunFormat) {
+        navigation.navigate('SelectTeam', {
+          ...route?.params,
+          tournament: {
+            ...tournament,
+            tournamentFormat: tournament?.tournamentFormat || 'SHOTGUN',
+          },
+          tournamentId,
+          returnTo: 'ShotgunSetup',
+          playMode: route?.params?.playMode || tournament?.playMode || 'challenge',
+          isCreator: true,
+          creatorSetupFlow: true,
         });
         return;
       }
@@ -522,7 +563,28 @@ const ConfigureGamesScreen = ({ navigation, route }) => {
         text2NumberOfLines: 0,
       });
 
-      navigation.navigate('SelectTeam', { ...route?.params, tournament, selectedTeam });
+      const fmt =
+        tournament?.tournamentFormat ??
+        tournament?.format ??
+        configData?.tournamentFormat;
+      const playMode =
+        route?.params?.playMode || tournament?.playMode || 'challenge';
+      if (String(fmt).toUpperCase() === 'SHOTGUN') {
+        navigation.navigate('SelectTeam', {
+          ...route?.params,
+          tournament: {
+            ...tournament,
+            tournamentFormat: fmt || 'SHOTGUN',
+          },
+          tournamentId,
+          isCreator: true,
+          creatorSetupFlow: true,
+          returnTo: 'ShotgunSetup',
+          playMode,
+        });
+      } else {
+        navigation.navigate('SelectTeam', { ...route?.params, tournament, selectedTeam });
+      }
     } catch (error) {
       console.log('Save configure games error:', error);
       const errData = error?.response?.data || error?.data || {};

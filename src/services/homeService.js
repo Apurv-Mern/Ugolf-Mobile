@@ -28,6 +28,34 @@ export const saveConfigureGamesApi = async (tournamentId, selections) => {
   return await putApi(ENDPOINTS.CONFIGURE_GAMES(tournamentId), { selections });
 };
 
+export const getShotgunStateApi = async (tournamentId) => {
+  return await getApi(ENDPOINTS.SHOTGUN(tournamentId));
+};
+
+export const assignShotgunTeamApi = async (tournamentId, gameNumber, body) => {
+  return await putApi(ENDPOINTS.SHOTGUN_ASSIGN(tournamentId, gameNumber), body);
+};
+
+export const claimShotgunStartHoleApi = async (tournamentId, gameNumber, body) => {
+  return await postApi(ENDPOINTS.SHOTGUN_CLAIM(tournamentId, gameNumber), body);
+};
+
+export const startShotgunGroupApi = async (tournamentId, gameNumber) => {
+  return await postApi(ENDPOINTS.SHOTGUN_START(tournamentId, gameNumber), {});
+};
+
+export const startAllShotgunGroupsApi = async (tournamentId) => {
+  return await postApi(ENDPOINTS.SHOTGUN_START_ALL(tournamentId), {});
+};
+
+export const getTournamentTeamsApi = async (tournamentId) => {
+  return await getApi(ENDPOINTS.TOURNAMENT_TEAMS(tournamentId));
+};
+
+export const pickUpShotgunHoleApi = async (tournamentId, sessionId) => {
+  return await postApi(ENDPOINTS.SHOTGUN_PICK_UP(tournamentId, sessionId), {});
+};
+
 // GET dynamic list of countries
 export const getCourseCountriesApi = async () => {
   return await getApi(ENDPOINTS.GET_COUNTRIES);

@@ -40,3 +40,10 @@ export const backSessionStepApi = async (tournamentId, sessionId) => {
 export const getClubRulesApi = async (params = {}) => {
   return await getApi(ENDPOINTS.GET_CLUB_RULES, params);
 };
+
+export const recordShotDistanceApi = async (tournamentId, sessionId, data) => {
+  return await postApi(
+    ENDPOINTS.GAME_SESSION_SHOT_DISTANCE(tournamentId, sessionId),
+    data,
+  );
+};

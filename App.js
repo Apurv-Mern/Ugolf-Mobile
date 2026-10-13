@@ -21,6 +21,8 @@ import SelectPlayOptionScreen from './src/screens/Play/SelectPlayOptionScreen';
 import SelectTeamSizeScreen from './src/screens/Play/SelectTeamSizeScreen';
 import SelectTournamentScreen from './src/screens/Play/SelectTournamentScreen';
 import CreateTournamentScreen from './src/screens/Play/CreateTournamentScreen';
+import ShotgunSetupScreen from './src/screens/Play/ShotgunSetupScreen';
+import ShotgunLobbyScreen from './src/screens/Play/ShotgunLobbyScreen';
 import ConfigureGamesScreen from './src/screens/Play/ConfigureGamesScreen';
 import SelectTeamScreen from './src/screens/Play/SelectTeamScreen';
 import CreateTeamScreen from './src/screens/Play/CreateTeamScreen';
@@ -178,6 +180,16 @@ function App() {
               <Stack.Screen
                 name="ConfigureGames"
                 component={ConfigureGamesScreen}
+                options={{ animation: 'slide_from_right' }}
+              />
+              <Stack.Screen
+                name="ShotgunLobby"
+                component={ShotgunLobbyScreen}
+                options={{ animation: 'slide_from_right' }}
+              />
+              <Stack.Screen
+                name="ShotgunSetup"
+                component={ShotgunSetupScreen}
                 options={{ animation: 'slide_from_right' }}
               />
               <Stack.Screen

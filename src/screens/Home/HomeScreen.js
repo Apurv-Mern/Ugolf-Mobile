@@ -2220,13 +2220,19 @@ import {
 import { shareTournamentLink } from '../../utils/shareUtils';
 import {
   classifyTournamentPlay,
+  liveRoundLabelsForTournament,
   groupGameHistoryByTournament,
   inProgressActivityMs,
   isChallengePlayMode,
   isChallengeLocked,
   leaderboardIndicatesStarted,
   unwrapReadiness,
+  resolveTournamentFormatLabel,
 } from '../../utils/playProgress';
+import {
+  isShotgunTournamentItem,
+  openShotgunTournament,
+} from '../../utils/shotgunNavigation';
 
 // ─── Bottom Tab Icons ────────────────────────────────────────────────────────
 const TAB_ITEMS = [
@@ -2340,6 +2346,7 @@ const HomeScreen = ({ navigation }) => {
       joined: joinedVal,
       source,
       playMode,
+      formatLabel: resolveTournamentFormatLabel(t),
       tournament: {
         ...t,
         id: t.id || t._id,
@@ -2364,6 +2371,8 @@ const HomeScreen = ({ navigation }) => {
     const nextGameNumber = item.nextGameNumber;
     const numberOfGames = item.numberOfGames || 1;
     const completedCount = item.completedCount || 0;
+    const formatLabel = resolveTournamentFormatLabel(item.tournament);
+    const shotgunLabels = liveRoundLabelsForTournament(item);
 
     if (item.hasActiveSession && item.activeSession?.id) {
       const session = item.activeSession;
@@ -2381,6 +2390,7 @@ const HomeScreen = ({ navigation }) => {
       const courseName = sessionRes?.golfCourseName || item.location || item.title;
       const nineLabel =
         totalHoles === 9 ? (holeStart <= 9 ? 'Front 9' : 'Back 9') : `${totalHoles} holes`;
+      const shotgunActive = liveRoundLabelsForTournament(item, sessionRes);
 
       return {
         tournament: item.tournament,
@@ -2391,13 +2401,42 @@ const HomeScreen = ({ navigation }) => {
         nextGameNumber,
         numberOfGames,
         hasActiveSession: true,
+        isShotgun: Boolean(shotgunActive),
+        shotgunAssignmentGameNumber: item.shotgunAssignmentGameNumber,
         title: courseName ? `${courseName} — ${nineLabel}` : nineLabel,
-        holeLabel: `Hole ${holeIndex} / ${totalHoles}`,
-        holeIndex,
-        totalHoles,
-        progress: holeIndex / totalHoles,
-        badge: 'LIVE ROUND',
-        actionLabel: `CONTINUE GAME ${Number(session.gameNumber) || nextGameNumber || 1}`,
+        holeLabel:
+          shotgunActive?.holeLabel || `Hole ${holeIndex} / ${totalHoles}`,
+        holeIndex: shotgunActive?.holeIndex ?? holeIndex,
+        totalHoles: shotgunActive?.totalHoles ?? totalHoles,
+        progress: shotgunActive?.progress ?? holeIndex / totalHoles,
+        badge: shotgunActive?.badge || 'LIVE ROUND',
+        actionLabel:
+          shotgunActive?.actionLabel ||
+          `CONTINUE GAME ${Number(session.gameNumber) || nextGameNumber || 1}`,
+        formatLabel,
+      };
+    }
+
+    if (shotgunLabels) {
+      return {
+        tournament: item.tournament,
+        tournamentName,
+        playMode,
+        sessionId: null,
+        gameNumber: item.shotgunAssignmentGameNumber || nextGameNumber || 1,
+        nextGameNumber,
+        numberOfGames,
+        hasActiveSession: false,
+        isShotgun: true,
+        shotgunAssignmentGameNumber: item.shotgunAssignmentGameNumber,
+        title: item.location || item.title,
+        holeLabel: shotgunLabels.holeLabel,
+        holeIndex: shotgunLabels.holeIndex,
+        totalHoles: shotgunLabels.totalHoles,
+        progress: shotgunLabels.progress,
+        badge: shotgunLabels.badge,
+        actionLabel: shotgunLabels.actionLabel,
+        formatLabel,
       };
     }
 
@@ -2410,6 +2449,7 @@ const HomeScreen = ({ navigation }) => {
       nextGameNumber,
       numberOfGames,
       hasActiveSession: false,
+      isShotgun: false,
       title:
         nextGameNumber != null
           ? `Start Game ${nextGameNumber} of ${numberOfGames}`
@@ -2421,6 +2461,7 @@ const HomeScreen = ({ navigation }) => {
       badge: item.gameStarted && !item.hasActiveSession ? 'GAME STARTED' : 'IN PROGRESS',
       actionLabel:
         nextGameNumber != null ? `START GAME ${nextGameNumber}` : 'CONTINUE',
+      formatLabel,
     };
   }, []);
 
@@ -2541,6 +2582,9 @@ const HomeScreen = ({ navigation }) => {
           completedCount: play.completedCount,
           completedGameNumbers: play.completedGameNumbers,
           gameStarted: play.gameStarted,
+          shotgunAssignmentGameNumber: play.shotgunAssignmentGameNumber,
+          tournamentFormat:
+            readinessObj?.tournamentFormat || item.tournament?.tournamentFormat,
         };
       });
 
@@ -2630,6 +2674,12 @@ const HomeScreen = ({ navigation }) => {
           ? 'practice'
           : item.tournament?.playMode || 'practice';
 
+    const uid =
+      userInfo?.user?.id ||
+      userInfo?.user?._id ||
+      userInfo?.data?.user?.id ||
+      userInfo?.id;
+
     if (item.isInProgress && item.activeSession?.id) {
       navigation.navigate('ActiveGame', {
         tournament: item.tournament,
@@ -2659,6 +2709,14 @@ const HomeScreen = ({ navigation }) => {
       return;
     }
 
+    if (isShotgunTournamentItem(item)) {
+      void openShotgunTournament(navigation, item, {
+        currentUserId: uid,
+        playMode,
+      });
+      return;
+    }
+
     if (
       item.source === 'invited' ||
       item.challengeLocked === true ||
@@ -2684,6 +2742,17 @@ const HomeScreen = ({ navigation }) => {
   const continueLiveRound = () => {
     if (!liveRound) return;
     const playMode = liveRound.playMode === 'CHALLENGE' ? 'challenge' : 'practice';
+    if (
+      liveRound.isShotgun &&
+      (liveRound.actionLabel === 'VIEW LEADERBOARD' || liveRound.badge === 'COMPLETE')
+    ) {
+      navigation.navigate('Leaderboard', {
+        tournament: liveRound.tournament,
+        playMode,
+        gameNumber: liveRound.gameNumber || 1,
+      });
+      return;
+    }
     if (liveRound.sessionId) {
       navigation.navigate('ActiveGame', {
         tournament: liveRound.tournament,
@@ -2693,11 +2762,15 @@ const HomeScreen = ({ navigation }) => {
       });
       return;
     }
+    const gameNum =
+      liveRound.isShotgun && liveRound.shotgunAssignmentGameNumber
+        ? liveRound.shotgunAssignmentGameNumber
+        : liveRound.nextGameNumber || liveRound.gameNumber || 1;
     navigation.navigate('SelectGame', {
       tournament: liveRound.tournament,
       playMode,
-      gameNumber: liveRound.nextGameNumber || liveRound.gameNumber || 1,
-      selectedGameIndex: Math.max(0, (liveRound.nextGameNumber || liveRound.gameNumber || 1) - 1),
+      gameNumber: gameNum,
+      selectedGameIndex: Math.max(0, gameNum - 1),
     });
   };
 
@@ -2809,9 +2882,23 @@ const HomeScreen = ({ navigation }) => {
                       <View style={activeStyles.liveDot} />
                       <Text style={activeStyles.liveText}>{liveRound.badge || 'LIVE ROUND'}</Text>
                     </View>
-                    <Text style={activeStyles.holeText}>
-                      {liveRound.holeLabel || `Hole ${liveRound.holeIndex} / ${liveRound.totalHoles}`}
-                    </Text>
+                    <View style={activeStyles.liveTopRight}>
+                      <View
+                        style={[
+                          activeStyles.formatBadge,
+                          liveRound.formatLabel === 'Shotgun'
+                            ? activeStyles.formatBadgeShotgun
+                            : activeStyles.formatBadgeNormal,
+                        ]}
+                      >
+                        <Text style={activeStyles.formatBadgeText}>
+                          {liveRound.formatLabel || 'Normal'}
+                        </Text>
+                      </View>
+                      <Text style={activeStyles.holeText}>
+                        {liveRound.holeLabel || `Hole ${liveRound.holeIndex} / ${liveRound.totalHoles}`}
+                      </Text>
+                    </View>
                   </View>
 
                   {liveRound.tournamentName ? (
@@ -2937,35 +3024,59 @@ const HomeScreen = ({ navigation }) => {
                       </TouchableOpacity>
                     ) : null;
                   })()}
-                  {!item.gameStarted &&
-                    !item.challengeLocked &&
-                    !item.tournament?.challengeLocked &&
-                    (item.source === 'mine' ||
+                  {(() => {
+                    const creatorId =
+                      item.tournament?.creatorUserId ||
+                      item.tournament?.creatorId ||
+                      item.tournament?.createdBy;
+                    const isCreator =
+                      item.source === 'mine' ||
                       (currentUserId &&
-                        String(
-                          item.tournament?.creatorUserId ||
-                          item.tournament?.creatorId ||
-                          item.tournament?.createdBy,
-                        ) === String(currentUserId))) ? (
-                    <TouchableOpacity
-                      style={activeStyles.cardEditBtn}
-                      onPress={(e) => {
-                        e.stopPropagation();
-                        navigation.navigate('CreateTournament', {
-                          tournament: item.tournament || item,
-                          isEditing: true,
-                          playMode:
-                            item.playMode === 'CHALLENGE' ||
-                              String(item.tournament?.playMode || '').toUpperCase().includes('CHALLENGE')
-                              ? 'challenge'
-                              : 'practice',
-                        });
-                      }}
-                      activeOpacity={0.7}
-                    >
-                      <Image source={editIcon} style={activeStyles.editIconImg} resizeMode="contain" />
-                    </TouchableOpacity>
-                  ) : null}
+                        creatorId &&
+                        String(creatorId).toLowerCase() ===
+                          String(currentUserId).toLowerCase());
+                    return isCreator && !item.isCompleted ? (
+                      <TouchableOpacity
+                        style={activeStyles.cardEditBtn}
+                        onPress={(e) => {
+                          e.stopPropagation();
+                          navigation.navigate('CreateTournament', {
+                            tournament: item.tournament || item,
+                            isEditing: true,
+                            playMode:
+                              item.playMode === 'CHALLENGE' ||
+                              String(item.tournament?.playMode || '')
+                                .toUpperCase()
+                                .includes('CHALLENGE')
+                                ? 'challenge'
+                                : 'practice',
+                          });
+                        }}
+                        activeOpacity={0.7}
+                      >
+                        <Image
+                          source={editIcon}
+                          style={activeStyles.editIconImg}
+                          resizeMode="contain"
+                        />
+                      </TouchableOpacity>
+                    ) : null;
+                  })()}
+                  <View
+                    style={[
+                      activeStyles.formatBadgeCard,
+                      (item.formatLabel ||
+                        resolveTournamentFormatLabel(item.tournament || item)) ===
+                      'Shotgun'
+                        ? activeStyles.formatBadgeCardShotgun
+                        : activeStyles.formatBadgeCardNormal,
+                    ]}
+                  >
+                    <Text style={activeStyles.formatBadgeCardText}>
+                      {item.formatLabel ||
+                        resolveTournamentFormatLabel(item.tournament || item)}
+                    </Text>
+                  </View>
                   {item.playMode ? (
                     <View
                       style={[
@@ -3404,6 +3515,33 @@ const activeStyles = StyleSheet.create({
     color: '#BCFF00',
     letterSpacing: 0.5,
   },
+  liveTopRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    justifyContent: 'flex-end',
+    gap: wp(1.5),
+    maxWidth: '58%',
+  },
+  formatBadge: {
+    borderRadius: moderateScale(12),
+    paddingHorizontal: wp(2.5),
+    paddingVertical: hp(0.3),
+    borderWidth: 1,
+  },
+  formatBadgeNormal: {
+    backgroundColor: '#F1F5F9',
+    borderColor: '#CBD5E1',
+  },
+  formatBadgeShotgun: {
+    backgroundColor: 'rgba(188, 255, 0, 0.35)',
+    borderColor: '#093A24',
+  },
+  formatBadgeText: {
+    fontFamily: FONTS.bold,
+    fontSize: fontSize(10),
+    color: '#093A24',
+  },
   holeText: {
     fontFamily: FONTS.medium,
     fontSize: fontSize(12),
@@ -3564,6 +3702,27 @@ const activeStyles = StyleSheet.create({
     width: moderateScale(15),
     height: moderateScale(15),
     tintColor: '#093A24',
+  },
+  formatBadgeCard: {
+    borderRadius: moderateScale(20),
+    paddingHorizontal: wp(2.5),
+    paddingVertical: hp(0.45),
+    borderWidth: 1.5,
+  },
+  formatBadgeCardNormal: {
+    backgroundColor: 'rgba(9, 58, 36, 0.85)',
+    borderColor: 'rgba(255, 255, 255, 0.75)',
+  },
+  formatBadgeCardShotgun: {
+    backgroundColor: 'rgba(9, 58, 36, 0.85)',
+    borderColor: '#BCFF00',
+  },
+  formatBadgeCardText: {
+    fontFamily: FONTS.bold,
+    fontSize: fontSize(10),
+    color: '#BCFF00',
+    letterSpacing: 0.4,
+    textTransform: 'uppercase',
   },
   modeBadge: {
     borderRadius: moderateScale(20),
