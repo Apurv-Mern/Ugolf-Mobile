@@ -1,4 +1,4 @@
-package com.ugolf
+package com.universalgolf
 
 import android.app.Application
 import com.facebook.react.PackageList

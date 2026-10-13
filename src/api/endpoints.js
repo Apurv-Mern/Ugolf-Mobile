@@ -20,6 +20,7 @@ export const ENDPOINTS = {
   // Player profile / subscription / history
   PLAYER_ME: "/api/v1/mobile/players/me",
   PLAYER_SUBSCRIPTION: "/api/v1/mobile/players/me/subscription",
+  VERIFY_GOOGLE_PURCHASE: "/api/v1/mobile/payments/verify-google-purchase",
   PLAYER_GAME_HISTORY: "/api/v1/mobile/players/me/game-history",
 
   TOURNAMENTS: "/api/v1/mobile/tournaments",

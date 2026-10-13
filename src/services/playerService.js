@@ -1,4 +1,4 @@
-import { getApi, putApi } from '../api/apiMethods';
+import { getApi, putApi, postApi } from '../api/apiMethods';
 import { ENDPOINTS } from '../api/endpoints';
 
 export const getPlayerProfileApi = async () => {
@@ -11,6 +11,10 @@ export const updatePlayerProfileApi = async (data) => {
 
 export const getPlayerSubscriptionApi = async () => {
   return await getApi(ENDPOINTS.PLAYER_SUBSCRIPTION);
+};
+
+export const verifyGooglePurchaseApi = async (data) => {
+  return await postApi(ENDPOINTS.VERIFY_GOOGLE_PURCHASE, data);
 };
 
 export const getPlayerGameHistoryApi = async (params) => {
