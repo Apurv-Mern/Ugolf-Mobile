@@ -712,7 +712,7 @@ const ChoosePlanScreen = ({ navigation }) => {
       // Construct purchase payload to send to backend verification API
       const purchasePayload = {
         packageName: 'com.universalgolf',
-        productId: 'ugolf_monthly_subscription',
+        productId: 'universal_golf_subscription:monthly',
         purchaseToken: 'sample_purchase_token',
         transactionId: 'GPA.sample_transaction_id',
         platform: 'android',

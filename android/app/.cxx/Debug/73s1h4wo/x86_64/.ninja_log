@@ -1,14 +1,14 @@
 # ninja log v5
-1	90	0	D:/Apurv/Projects/Ugolf-Mobile/android/app/.cxx/Debug/73s1h4wo/x86_64/CMakeFiles/cmake.verify_globs	c669dd0dbef91d6a
+2	88	0	D:/Apurv/Projects/Ugolf-Mobile/android/app/.cxx/Debug/73s1h4wo/x86_64/CMakeFiles/cmake.verify_globs	c669dd0dbef91d6a
 43843	76287	8131472857769765	rnscreens_autolinked_build/CMakeFiles/react_codegen_rnscreens.dir/f3cdd7dbd857e9d8da94a075f9fda6bc/cpp/react/renderer/components/rnscreens/RNSScreenShadowNodeCommitHook.cpp.o	f8f00a960a80c7f4
-27551	39568	8131472496103451	rnreanimated_autolinked_build/CMakeFiles/react_codegen_rnreanimated.dir/react/renderer/components/rnreanimated/EventEmitters.cpp.o	7e8ad804a2d04fa
-504	22979	8131472327471382	RNDateTimePickerCGen_autolinked_build/CMakeFiles/react_codegen_RNDateTimePickerCGen.dir/react/renderer/components/RNDateTimePickerCGen/ShadowNodes.cpp.o	fe8dc87f2b853d1
-29236	50533	8131472604096685	rnreanimated_autolinked_build/CMakeFiles/react_codegen_rnreanimated.dir/react/renderer/components/rnreanimated/ComponentDescriptors.cpp.o	a023699830c03610
 337	12197	8131472220798056	rnblurview_autolinked_build/CMakeFiles/react_codegen_rnblurview.dir/react/renderer/components/rnblurview/States.cpp.o	466366766d27d7ac
 81247	96548	8131473064181843	RNVectorIconsSpec_autolinked_build/CMakeFiles/react_codegen_RNVectorIconsSpec.dir/react/renderer/components/RNVectorIconsSpec/EventEmitters.cpp.o	ce7b4d5dd5ea0c74
+29236	50533	8131472604096685	rnreanimated_autolinked_build/CMakeFiles/react_codegen_rnreanimated.dir/react/renderer/components/rnreanimated/ComponentDescriptors.cpp.o	a023699830c03610
+27551	39568	8131472496103451	rnreanimated_autolinked_build/CMakeFiles/react_codegen_rnreanimated.dir/react/renderer/components/rnreanimated/EventEmitters.cpp.o	7e8ad804a2d04fa
+504	22979	8131472327471382	RNDateTimePickerCGen_autolinked_build/CMakeFiles/react_codegen_RNDateTimePickerCGen.dir/react/renderer/components/RNDateTimePickerCGen/ShadowNodes.cpp.o	fe8dc87f2b853d1
+579	4196	8136797069579297	CMakeFiles/appmodules.dir/OnLoad.cpp.o	c38ea89a4b57b518
 363	15382	8131472249861680	rnblurview_autolinked_build/CMakeFiles/react_codegen_rnblurview.dir/rnblurview-generated.cpp.o	773dae5b9cbf1728
 15384	41858	8131472515979562	rngesturehandler_codegen_autolinked_build/CMakeFiles/react_codegen_rngesturehandler_codegen.dir/82bfb5c454f821faffc919456d12d1ea/components/rngesturehandler_codegen/Props.cpp.o	659c4179d75b02b7
-12	21375	8131472311804292	CMakeFiles/appmodules.dir/OnLoad.cpp.o	c38ea89a4b57b518
 281	12835	8131472226984020	rnblurview_autolinked_build/CMakeFiles/react_codegen_rnblurview.dir/react/renderer/components/rnblurview/EventEmitters.cpp.o	a1f015f06ff18ac4
 42647	55543	8131472654267824	rnreanimated_autolinked_build/CMakeFiles/react_codegen_rnreanimated.dir/rnreanimated-generated.cpp.o	67dbe2e47a8022d4
 230	12618	8131472224738620	AsyncStorageSpec_autolinked_build/CMakeFiles/react_codegen_AsyncStorageSpec.dir/react/renderer/components/AsyncStorageSpec/States.cpp.o	dbf159c49f9d3803
@@ -103,7 +103,7 @@
 92282	111092	8131473208205004	rnworklets_autolinked_build/CMakeFiles/react_codegen_rnworklets.dir/rnworklets-generated.cpp.o	dc81913a8a664450
 101222	111910	8131473218457358	rnsvg_autolinked_build/CMakeFiles/react_codegen_rnsvg.dir/aa62967fed47677773fee71de925c0a6/android/build/generated/source/codegen/jni/react/renderer/components/rnsvg/States.cpp.o	bd998f9dac3e8301
 73034	112747	8131473227095606	rnscreens_autolinked_build/CMakeFiles/react_codegen_rnscreens.dir/rnscreens.cpp.o	7bb7c77a64e7643f
-46	114209	8131473231117813	CMakeFiles/appmodules.dir/D_/Apurv/Projects/Ugolf-Mobile/android/app/build/generated/autolinking/src/main/jni/autolinking.cpp.o	2ffa776af9452ea8
+45	19301	8136797218317853	CMakeFiles/appmodules.dir/D_/Apurv/Projects/Ugolf-Mobile/android/app/build/generated/autolinking/src/main/jni/autolinking.cpp.o	2ffa776af9452ea8
 94253	114404	8131473244258893	rnsvg_autolinked_build/CMakeFiles/react_codegen_rnsvg.dir/e0a11296aded32cd0a1a103e8b18a8ad/build/generated/source/codegen/jni/react/renderer/components/rnsvg/EventEmitters.cpp.o	3db4a836f6506684
 70560	115865	8131473257677891	rnscreens_autolinked_build/CMakeFiles/react_codegen_rnscreens.dir/e3fcd9b2fbc14bd17496e4beb3658703/source/codegen/jni/react/renderer/components/rnscreens/EventEmitters.cpp.o	490c0313a26c0b1e
 71257	116409	8131473263318123	rnscreens_autolinked_build/CMakeFiles/react_codegen_rnscreens.dir/f46b0a57770e4d8981436ad25bd4d372/generated/source/codegen/jni/react/renderer/components/rnscreens/Props.cpp.o	6367be686575a33c
@@ -112,5 +112,5 @@
 99477	122387	8131473323277288	rnsvg_autolinked_build/CMakeFiles/react_codegen_rnsvg.dir/7a141484b0b74af7b7958d61c4519ed7/generated/source/codegen/jni/react/renderer/components/rnsvg/ComponentDescriptors.cpp.o	785aa7d235a387b4
 96550	122413	8131473323838688	rnsvg_autolinked_build/CMakeFiles/react_codegen_rnsvg.dir/rnsvg.cpp.o	a5775096ea8d77d2
 116876	123463	8131473334902680	D:/Apurv/Projects/Ugolf-Mobile/android/app/build/intermediates/cxx/Debug/73s1h4wo/obj/x86_64/libreact_codegen_rnscreens.so	4b767ea33215d23e
-128409	135163	8131473451702642	D:/Apurv/Projects/Ugolf-Mobile/android/app/build/intermediates/cxx/Debug/73s1h4wo/obj/x86_64/libappmodules.so	d08a1532b94d33a3
-2	85	0	D:/Apurv/Projects/Ugolf-Mobile/android/app/.cxx/Debug/73s1h4wo/x86_64/CMakeFiles/cmake.verify_globs	c669dd0dbef91d6a
+19302	30286	8136797329797857	D:/Apurv/Projects/Ugolf-Mobile/android/app/build/intermediates/cxx/Debug/73s1h4wo/obj/x86_64/libappmodules.so	d08a1532b94d33a3
+2	156	0	D:/Apurv/Projects/Ugolf-Mobile/android/app/.cxx/Debug/73s1h4wo/x86_64/CMakeFiles/cmake.verify_globs	c669dd0dbef91d6a
