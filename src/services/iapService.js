@@ -11,9 +11,9 @@ import { verifyGooglePurchaseApi } from './playerService';
 import { Platform } from 'react-native';
 
 export const SUBSCRIPTION_SKUS = Platform.select({
-  android: ['ugolf_monthly_subscription'],
-  ios: ['UGolf_Monthly_Subscription'],
-  default: ['ugolf_monthly_subscription'],
+  android: ['universal_golf_subscription:monthly', 'universal_golf_subscription:yearly'],
+  ios: ['com.universalgolf.monthly', 'com.universalgolf.yearly'],
+  default: ['universal_golf_subscription:monthly'],
 });
 
 /**
