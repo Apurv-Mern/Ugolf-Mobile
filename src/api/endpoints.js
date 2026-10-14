@@ -62,6 +62,8 @@ export const ENDPOINTS = {
     `/api/v1/mobile/tournaments/${tournamentId}/teams/${teamId}`,
   TOURNAMENT_TEAM_SELECT: (id) =>
     `/api/v1/mobile/tournaments/${id}/teams/select`,
+  TOURNAMENT_SHARE_LINK_PREPARE: (id) =>
+    `/api/v1/mobile/tournaments/${id}/share-link/prepare`,
   TOURNAMENT_TEAM_SEND_INVITE_NOTIFICATIONS: (tournamentId, teamId) =>
     `/api/v1/mobile/tournaments/${tournamentId}/teams/${teamId}/send-invite-notifications`,
 

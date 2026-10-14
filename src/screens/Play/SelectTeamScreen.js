@@ -263,7 +263,14 @@ const SelectTeamScreen = ({ navigation, route }) => {
       setSubmitting(true);
       try {
         if (!challengeLocked) {
+          const joinToken =
+            route?.params?.joinToken ||
+            route?.params?.token ||
+            null;
           const payload = { teamId: selectedTeam.id };
+          if (joinToken) {
+            payload.joinToken = String(joinToken).trim();
+          }
           await selectTournamentTeamApi(tournamentId, payload);
           Toast.show({
             type: 'success',

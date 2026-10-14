@@ -9,6 +9,13 @@ export const getTournamentByIdApi = async (id) => {
   return await getApi(ENDPOINTS.TOURNAMENT_BY_ID(id));
 };
 
+/** Share link (Approach B): create inbox row before team select. */
+export const prepareShareLinkJoinApi = async (tournamentId, joinToken) => {
+  return await postApi(ENDPOINTS.TOURNAMENT_SHARE_LINK_PREPARE(tournamentId), {
+    joinToken,
+  });
+};
+
 export const createTournamentApi = async data => {
   return await postApi(ENDPOINTS.TOURNAMENTS, data);
 };

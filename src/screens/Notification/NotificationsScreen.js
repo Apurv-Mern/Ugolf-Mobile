@@ -1661,7 +1661,10 @@ const NotificationsScreen = ({ navigation }) => {
     const raw = item.rawItem || item;
     const data = raw.data || item.data || {};
     if (data.deepLink || data.tournamentId) {
-      processDeepLink(data, navigation);
+      processDeepLink(
+        { ...data, skipShareLinkPrepare: true },
+        navigation,
+      );
     }
   };
 
@@ -1725,13 +1728,19 @@ const NotificationsScreen = ({ navigation }) => {
       }
 
 
-      const successMsg =
-        type.includes('TOURNAMENT')
+      const isShareLinkJoin = type === 'TOURNAMENT_SHARE_LINK_JOIN';
+      const isHostTournamentInvite = type === 'TOURNAMENT_TEAM_INVITE';
+
+      const successMsg = isShareLinkJoin
+        ? 'Share link accepted. Select your team to join.'
+        : isHostTournamentInvite
           ? 'Tournament invite accepted. It now appears under Invited.'
-          : `Joined ${res?.invite?.teamName ||
-          res?.teamName ||
-          'the team'
-          }.`;
+          : type.includes('TOURNAMENT')
+            ? 'Tournament invite accepted.'
+            : `Joined ${res?.invite?.teamName ||
+            res?.teamName ||
+            'the team'
+            }.`;
 
 
       Toast.show({
@@ -1744,13 +1753,39 @@ const NotificationsScreen = ({ navigation }) => {
       setEarlierList((prev) => markInviteResponded(prev, item.id, 'accepted'));
 
       const data = raw.data || item.data || {};
+
+      if (isShareLinkJoin) {
+        const joinToken =
+          res?.joinToken ||
+          data.joinToken ||
+          data.token ||
+          null;
+        const tournamentId =
+          res?.tournamentId ||
+          data.tournamentId ||
+          null;
+        if (tournamentId && joinToken) {
+          navigation.navigate('SelectTeam', {
+            tournamentId,
+            tournament: {
+              id: tournamentId,
+              name: data.tournamentName || 'Tournament',
+            },
+            joinToken,
+            token: joinToken,
+            playMode: data.playMode || 'practice',
+          });
+        }
+        return;
+      }
+
       if (data.deepLink || data.tournamentId) {
         processDeepLink(
           {
             ...data,
-            ...(type.includes('TOURNAMENT')
-              ? { afterTournamentInviteAccept: true }
-              : {}),
+            ...(isHostTournamentInvite
+              ? { afterTournamentInviteAccept: true, skipShareLinkPrepare: true }
+              : { skipShareLinkPrepare: true }),
           },
           navigation,
         );
@@ -1903,7 +1938,8 @@ const NotificationsScreen = ({ navigation }) => {
 
     const isIncomingInvite =
       typeStr === 'TEAM_MEMBER_INVITE' ||
-      typeStr === 'TOURNAMENT_TEAM_INVITE';
+      typeStr === 'TOURNAMENT_TEAM_INVITE' ||
+      typeStr === 'TOURNAMENT_SHARE_LINK_JOIN';
 
     const showActionButtons =
       isIncomingInvite &&

@@ -174,6 +174,7 @@ import { navigate } from "../navigation/RootNavigator";
 import {
   getTournamentByIdApi,
   getTournamentsApi,
+  prepareShareLinkJoinApi,
 } from "../services/homeService";
 import { store } from "../redux/store";
 import {
@@ -235,6 +236,7 @@ export const extractParamsFromUrl = (urlOrData) => {
     teamName: null,
     playMode: null,
     tournamentName: null,
+    linkType: null,
   };
 
   if (!urlOrData) return params;
@@ -256,6 +258,11 @@ export const extractParamsFromUrl = (urlOrData) => {
       urlOrData.tournamentName ||
       urlOrData.tournament?.name ||
       urlOrData.tournament?.title ||
+      null;
+
+    params.linkType =
+      urlOrData.linkType ||
+      urlOrData.type ||
       null;
 
     // If a notification wraps the actual URL, parse that URL too.
@@ -291,6 +298,10 @@ export const extractParamsFromUrl = (urlOrData) => {
     getQueryParam(urlOrData, "playMode") || getQueryParam(urlOrData, "mode");
 
   params.tournamentName = getQueryParam(urlOrData, "tournamentName");
+
+  params.linkType =
+    getQueryParam(urlOrData, "type") ||
+    getQueryParam(urlOrData, "linkType");
 
   // Legacy path formats: /tournament/UUID or /tournaments/UUID.
   if (!params.tournamentId) {
@@ -376,7 +387,47 @@ export const processDeepLink = async (urlOrData, navigationOverride = null) => {
     token,
     teamId,
     teamName,
+    linkType,
   } = params;
+
+  const nav = navigationAdapter(navigationOverride);
+
+  const linkTypeNorm = String(linkType || "").toLowerCase();
+  const isHostInviteLink =
+    linkTypeNorm === "invited" && !token && Boolean(incomingTournamentId);
+  const isShareLink = Boolean(token && incomingTournamentId);
+  const skipSharePrepare =
+    typeof urlOrData === "object" &&
+    urlOrData.skipShareLinkPrepare === true;
+
+  if (isHostInviteLink) {
+    console.log("[DeepLink] Host team invite link — opening Notifications.");
+    nav.navigate("Notifications");
+    return true;
+  }
+
+  if (isShareLink && !skipSharePrepare) {
+    console.log("[DeepLink] Share link — prepare then Notifications.");
+    try {
+      const prep = await prepareShareLinkJoinApi(
+        incomingTournamentId,
+        String(token).trim(),
+      );
+      if (prep?.alreadyOnRoster) {
+        console.log("[DeepLink] Already on roster — opening tournament.");
+      } else {
+        nav.navigate("Notifications");
+        return true;
+      }
+    } catch (error) {
+      console.log(
+        "[DeepLink] Share link prepare failed:",
+        error?.response?.data || error?.message || error,
+      );
+      nav.navigate("Notifications");
+      return true;
+    }
+  }
 
   // A token is not an ID. Do not send it to the ID endpoint.
   if (!incomingTournamentId && !token) {
