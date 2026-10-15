@@ -169,7 +169,11 @@ client.interceptors.response.use(
         }
       }
 
-      await forceLogout('Your session has expired. Please login again.');
+      const hadBearer = Boolean(originalRequest?.headers?.Authorization);
+      const refreshToken = await getStorageData('refreshToken');
+      if (hadBearer || refreshToken) {
+        await forceLogout('Your session has expired. Please login again.');
+      }
       return Promise.reject(error);
     }
 

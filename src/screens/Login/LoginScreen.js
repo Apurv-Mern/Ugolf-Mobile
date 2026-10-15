@@ -482,6 +482,7 @@ import { useDispatch } from 'react-redux';
 import { loginApi } from '../../services/authService';
 import { setLoginData } from '../../redux/slices/authSlice';
 import { setStorageData, getStorageData, removeStorageData } from '../../storage/storage';
+import { flushPendingShareLinkAfterAuth } from '../../utils/deepLinkHandler';
 
 const LoginScreen = ({ navigation }) => {
   const dispatch = useDispatch();
@@ -663,11 +664,12 @@ const LoginScreen = ({ navigation }) => {
 
       // Login always goes directly to MainApp.
       // Subscription screen is only shown after new registration (not on login).
-      timerRef.current = setTimeout(() => {
+      timerRef.current = setTimeout(async () => {
         navigation.reset({
           index: 0,
           routes: [{ name: 'MainApp' }],
         });
+        await flushPendingShareLinkAfterAuth(navigation);
       }, 1500);
     } catch (error) {
       const errorData = error?.response?.data;

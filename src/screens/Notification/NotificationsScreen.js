@@ -1217,6 +1217,7 @@ import {
   getUnreadNotificationsCountApi,
 } from '../../services/notificationService';
 import { processDeepLink } from '../../utils/deepLinkHandler';
+import { getStorageData } from '../../storage/storage';
 
 
 // ============================================================
@@ -1353,6 +1354,13 @@ const NotificationsScreen = ({ navigation }) => {
 
   const fetchNotifications = async (isRefreshing = false) => {
     try {
+      const accessToken = await getStorageData('token');
+      if (!accessToken) {
+        setLoading(false);
+        setRefreshing(false);
+        return;
+      }
+
       if (!isRefreshing) setLoading(true);
 
       const res = await getNotificationsApi({

@@ -77,7 +77,8 @@ export const shareTournamentLink = async (tournament) => {
     joinUrl =
       `https://ugolf-frontend.24livehost.com/join` +
       `?tournamentId=${encodeURIComponent(tournamentId)}` +
-      `&token=${encodeURIComponent(joinToken)}`;
+      `&token=${encodeURIComponent(joinToken)}` +
+      `&type=shared`;
   }
 
   if (!joinUrl && tournamentId) {

@@ -175,7 +175,15 @@ import {
   getTournamentByIdApi,
   getTournamentsApi,
   prepareShareLinkJoinApi,
+  resolveJoinLinkApi,
 } from "../services/homeService";
+import { getStorageData } from "../storage/storage";
+import {
+  clearPendingShareLink,
+  getPendingShareLink,
+  isUuid,
+  setPendingShareLink,
+} from "./pendingShareLink";
 import { store } from "../redux/store";
 import {
   isShotgunTournamentItem,
@@ -376,6 +384,102 @@ const getPlayMode = (params, tournament) => {
   ).toLowerCase();
 };
 
+async function hasAuthToken() {
+  const token = await getStorageData("token");
+  return Boolean(token);
+}
+
+async function resolveTournamentIdForShare(tournamentId, joinToken) {
+  if (isUuid(tournamentId)) {
+    return tournamentId;
+  }
+  if (!joinToken) {
+    return null;
+  }
+  try {
+    const res = await resolveJoinLinkApi({
+      token: joinToken,
+      type: "shared",
+      ...(isUuid(tournamentId) ? { tournamentId } : {}),
+    });
+    const preview = res?.preview || res?.data?.preview;
+    return preview?.tournamentId || null;
+  } catch (error) {
+    console.log(
+      "[DeepLink] join-link resolve failed:",
+      error?.response?.data || error?.message || error,
+    );
+    return null;
+  }
+}
+
+async function runShareLinkPrepareFlow(
+  nav,
+  tournamentId,
+  joinToken,
+  { skipPrepare = false } = {},
+) {
+  const resolvedId = await resolveTournamentIdForShare(
+    tournamentId,
+    joinToken,
+  );
+  if (!resolvedId || !isUuid(resolvedId)) {
+    console.log(
+      "[DeepLink] Cannot prepare share link — invalid tournament id:",
+      tournamentId,
+    );
+    return false;
+  }
+
+  if (!(await hasAuthToken())) {
+    setPendingShareLink({
+      tournamentId: resolvedId,
+      joinToken,
+    });
+    nav.navigate("Auth");
+    return true;
+  }
+
+  if (!skipPrepare) {
+    try {
+      const prep = await prepareShareLinkJoinApi(resolvedId, joinToken);
+      if (prep?.alreadyOnRoster) {
+        console.log("[DeepLink] Already on roster — continue tournament open.");
+        return false;
+      }
+    } catch (error) {
+      console.log(
+        "[DeepLink] Share link prepare failed:",
+        error?.response?.data || error?.message || error,
+      );
+    }
+  }
+
+  nav.navigate("Notifications");
+  return true;
+}
+
+/** Call after login or splash session restore. */
+export async function flushPendingShareLinkAfterAuth(
+  navigationOverride = null,
+) {
+  const pending = getPendingShareLink();
+  if (!pending?.joinToken) {
+    return false;
+  }
+  if (!(await hasAuthToken())) {
+    return false;
+  }
+
+  clearPendingShareLink();
+  const nav = navigationAdapter(navigationOverride);
+  return runShareLinkPrepareFlow(
+    nav,
+    pending.tournamentId,
+    pending.joinToken,
+  );
+}
+
 /**
  * Process a tournament deep link and navigate to the appropriate screen.
  */
@@ -395,36 +499,41 @@ export const processDeepLink = async (urlOrData, navigationOverride = null) => {
   const linkTypeNorm = String(linkType || "").toLowerCase();
   const isHostInviteLink =
     linkTypeNorm === "invited" && !token && Boolean(incomingTournamentId);
-  const isShareLink = Boolean(token && incomingTournamentId);
+  const isShareLink =
+    Boolean(token && incomingTournamentId) ||
+    ((linkTypeNorm === "shared" || linkTypeNorm === "share") &&
+      Boolean(incomingTournamentId));
   const skipSharePrepare =
     typeof urlOrData === "object" &&
     urlOrData.skipShareLinkPrepare === true;
 
   if (isHostInviteLink) {
-    console.log("[DeepLink] Host team invite link — opening Notifications.");
+    console.log("[DeepLink] Host team invite link.");
+    if (!(await hasAuthToken())) {
+      nav.navigate("Auth");
+      return true;
+    }
     nav.navigate("Notifications");
     return true;
   }
 
   if (isShareLink && !skipSharePrepare) {
-    console.log("[DeepLink] Share link — prepare then Notifications.");
-    try {
-      const prep = await prepareShareLinkJoinApi(
-        incomingTournamentId,
-        String(token).trim(),
-      );
-      if (prep?.alreadyOnRoster) {
-        console.log("[DeepLink] Already on roster — opening tournament.");
-      } else {
-        nav.navigate("Notifications");
+    if (!token) {
+      console.log("[DeepLink] Share link without token — need login.");
+      if (!(await hasAuthToken())) {
+        nav.navigate("Auth");
         return true;
       }
-    } catch (error) {
-      console.log(
-        "[DeepLink] Share link prepare failed:",
-        error?.response?.data || error?.message || error,
-      );
       nav.navigate("Notifications");
+      return true;
+    }
+    console.log("[DeepLink] Share link — prepare after auth.");
+    const handled = await runShareLinkPrepareFlow(
+      nav,
+      incomingTournamentId,
+      String(token).trim(),
+    );
+    if (handled) {
       return true;
     }
   }

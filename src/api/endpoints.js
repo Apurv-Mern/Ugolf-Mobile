@@ -24,6 +24,7 @@ export const ENDPOINTS = {
   PLAYER_GAME_HISTORY: "/api/v1/mobile/players/me/game-history",
 
   TOURNAMENTS: "/api/v1/mobile/tournaments",
+  TOURNAMENT_JOIN_LINK: "/api/v1/mobile/tournaments/join-link",
   TOURNAMENT_BY_ID: (id) => `/api/v1/mobile/tournaments/${id}`,
   TOURNAMENT_LEADERBOARD: (id) =>
     `/api/v1/mobile/tournaments/${id}/leaderboard`,

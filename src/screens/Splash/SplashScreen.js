@@ -341,6 +341,7 @@ import {
 import { STORAGE_KEYS } from '../../constants/storageKeys';
 import { getPlayerProfileApi } from '../../services/playerService';
 import { setLoginData } from '../../redux/slices/authSlice';
+import { flushPendingShareLinkAfterAuth } from '../../utils/deepLinkHandler';
 
 const splashBg = require('../../assets/Images/Splash Bg (2).png');
 
@@ -394,6 +395,7 @@ const SplashScreen = ({ navigation }) => {
 
             // User is logged in, navigate straight to MainApp
             navigation.replace('MainApp');
+            await flushPendingShareLinkAfterAuth(navigation);
 
             // Refresh user profile in background
             getPlayerProfileApi()
@@ -440,6 +442,7 @@ const SplashScreen = ({ navigation }) => {
               );
 
               navigation.replace('MainApp');
+              await flushPendingShareLinkAfterAuth(navigation);
               return;
             }
           } catch (hydrateErr) {

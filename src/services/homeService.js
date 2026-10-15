@@ -9,6 +9,11 @@ export const getTournamentByIdApi = async (id) => {
   return await getApi(ENDPOINTS.TOURNAMENT_BY_ID(id));
 };
 
+/** Public — no auth. Resolve tournamentId from share token. */
+export const resolveJoinLinkApi = async (params) => {
+  return await getApi(ENDPOINTS.TOURNAMENT_JOIN_LINK, params);
+};
+
 /** Share link (Approach B): create inbox row before team select. */
 export const prepareShareLinkJoinApi = async (tournamentId, joinToken) => {
   return await postApi(ENDPOINTS.TOURNAMENT_SHARE_LINK_PREPARE(tournamentId), {
