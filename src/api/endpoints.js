@@ -1,10 +1,10 @@
 import { resolveDevBaseUrl } from './devConfig';
 
 // Production / staging:
-// const BASE_URL = 'https://ugolf-backend.24livehost.com:5011';
+const BASE_URL = 'https://ugolf-backend.24livehost.com:5011';
 
 /** Local dev — see devConfig.js (LAN IP for phone, 10.0.2.2 for emulator). */
-const BASE_URL = resolveDevBaseUrl();
+// const BASE_URL = resolveDevBaseUrl();
 
 export const ENDPOINTS = {
   LOGIN: "/api/v1/mobile/auth/login",
