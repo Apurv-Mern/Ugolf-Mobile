@@ -222,7 +222,7 @@ const getQueryParam = (url, name) => {
   if (typeof url !== "string") return null;
 
   const escapedName = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  const match = url.match(new RegExp(`[?&]${escapedName}=([^&#] *)`, "i"));
+  const match = url.match(new RegExp(`[?&]${escapedName}=([^&#]*)`, "i"));
 
   return match ? decodeValue(match[1]) : null;
 };
