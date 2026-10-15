@@ -129,11 +129,10 @@ client.interceptors.response.use(
     console.log('FAILED API =>', failedApi);
     console.log('STATUS =>', status);
 
-    // If account has been suspended (403 or suspension error)
-    if (
-      (status === 403 || errorMsg.includes('suspend') || errorMsg.includes('suspended')) &&
-      !shouldSkipAuthRetry(failedApi)
-    ) {
+    // Only force logout for explicit account suspension — not every 403 (e.g. not a tournament participant yet).
+    const isAccountSuspended =
+      errorMsg.includes('suspend') || errorMsg.includes('suspended');
+    if (isAccountSuspended && !shouldSkipAuthRetry(failedApi)) {
       console.log('ACCOUNT SUSPENDED → REDIRECT TO LOGIN');
       await forceLogout(
         errorData?.error || errorData?.message || 'Your account has been suspended. Please contact support.',

@@ -53,10 +53,22 @@ const SelectTeamScreen = ({ navigation, route }) => {
   const loadTeams = async () => {
     try {
       setLoading(true);
-      const tournamentId = route?.params?.tournament?.id || route?.params?.tournament?._id;
+      const tournamentId =
+        route?.params?.tournamentId ||
+        route?.params?.tournament?.id ||
+        route?.params?.tournament?._id;
+      const joinToken =
+        route?.params?.joinToken || route?.params?.token || null;
+      const isShareLinkJoinFlow = Boolean(
+        joinToken && String(joinToken).trim().length >= 8,
+      );
 
       let tournamentTeams = [];
-      if (tournamentId && isUuid(String(tournamentId))) {
+      if (
+        tournamentId &&
+        isUuid(String(tournamentId)) &&
+        !isShareLinkJoinFlow
+      ) {
         try {
           const tRes = await getTournamentTeamsApi(tournamentId);
           const backendOwnId = tRes?.ownSelectedTeamId || tRes?.data?.ownSelectedTeamId;

@@ -1210,7 +1210,6 @@ import {
 
 import {
   getNotificationsApi,
-  markAllNotificationsReadApi,
   clearAllNotificationsApi,
   markNotificationReadApi,
   respondToNotificationApi,
@@ -1547,11 +1546,6 @@ const NotificationsScreen = ({ navigation }) => {
         setEarlierList(activeEarlier);
       }
 
-      try {
-        await markAllNotificationsReadApi();
-      } catch (markErr) {
-        console.log('Mark all notifications read note:', markErr);
-      }
       await refreshUnreadCount();
     } catch (err) {
       console.log(
