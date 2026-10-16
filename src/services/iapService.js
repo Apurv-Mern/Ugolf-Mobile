@@ -192,7 +192,7 @@ export const buySubscription = async (planId = 'monthly') => {
       );
     }
 
-    const offers = product.subscriptionOfferDetailsAndroid ?? [];
+    const offers = product.subscriptionOffers ?? [];
 
     // A base plan may be returned as an offer detail even without
     // a promotional discount. Select the plan configured in Play Console.
